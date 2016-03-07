@@ -27,6 +27,9 @@ class Stream(AbstractStream):
     """Stream of samples.
     """
 
+    def _construct(self, iterator):
+        return Stream(iterator)
+
     @property
     def nblock(self):
         raise AttributeError("Stream does not have a blocksize")
@@ -34,18 +37,16 @@ class Stream(AbstractStream):
     def blocks(self, nblock, kind=np.array):
         return BlockStream(streaming._iterator.blocked(nblock, self._iterator, kind=kind), nblock)
 
-    def copy(self):
-        self._iterator, iterator = itertools.tee(self._iterator)
-        return Stream(iterator)
-
-    def drop(self, n):
-        return Stream(toolz.drop(n, self))
+    def drop(self, nsamples):
+        """Drop the first `n` samples."""
+        return super().drop(nsamples)
 
     def map(self, func):
-        return Stream(map(func, self._iterator))
+        return self._construct(map(func, self._iterator))
 
     def take(self, nsamples):
-        return Stream(cytoolz.take(nsamples, self.samples()))
+        """Take the first `nsamples` samples."""
+        return super().take(nsamples)
 
     def samples(self):
         return self
@@ -76,8 +77,8 @@ class BlockStream(AbstractStream):
 
         self._nblock = nblock
 
-    #def _fastmap(self, func):
-        #return self.map(func)
+    def _construct(self, iterator):
+        return BlockStream(iterator, self.nblock)
 
     @property
     def nblock(self):
@@ -101,28 +102,17 @@ class BlockStream(AbstractStream):
         else:
             return self.samples().blocks(nblock=nblock, kind=kind)
 
-    def copy(self):
-        self._iterator, iterator = itertools.tee(self._iterator)
-        return BlockStream(iterator, self.nblock)
-
     def drop(self, n):
-        """Drop the first `n` samples.
-
-        .. warning:: Drops `n` samples, not `n` blocks. See `:meth:`dropblocks` for that.
-        """
-        return self.samples().drop(n)
-
-    def dropblocks(self, n):
         """Drop the first `n` blocks.
 
-        .. warning:: Drops `n` blocks, not `n` samples. See `:meth:`drop` for that.
+        .. note:: If you want to drop `n` samples, use `s.samples().drop(n)`.
         """
-        return BlockStream(toolz.drop(n, self), self.nblock)
+        return self._construct(cytoolz.drop(n, self))
 
     def map(self, func):
         """Map `func` to each block in :class:`BlockStream`.
         """
-        return BlockStream(map(func, self), self.nblock)
+        return self._construct(map(func, self))
 
     def mean(self):
         """Mean value calculated over `nblock` samples.
@@ -138,14 +128,6 @@ class BlockStream(AbstractStream):
         """
         return count(self)
 
-    #def peekblock(self):
-        #"""Check the first block in the stream.
-
-        #.. seealso:: :meth:`peek`
-        #"""
-        #first, self._iterator = cytoolz.peek(self)
-        #return first
-
     def std(self):
         """Standard deviation calculated over `nblock` samples.
 
@@ -160,15 +142,10 @@ class BlockStream(AbstractStream):
         """
         return Stream(self.map(np.sum))
 
-    def take(self, nsamples):
-        """Take `nsamples` from Stream.
+    def take(self, nblocks):
+        """Take `nblocks` from stream.
         """
-        return Stream(cytoolz.take(nsamples, self.samples()._iterator))
-
-    def takeblocks(self, nblocks):
-        """Take `nblocks` from BlockStream.
-        """
-        return BlockStream(cytoolz.take(nblocks, self._iterator), self.nblock)
+        return self._construct(cytoolz.take(nblocks, self._iterator))
 
     def samples(self):
         """Iterate over samples.

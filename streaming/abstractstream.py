@@ -151,6 +151,11 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
         pass
 
     @abc.abstractmethod
+    def _construct(self, iterable):
+        """Construct instance of this type from given `iterable`"""
+        pass
+
+    @abc.abstractmethod
     def blocks(self):
         """Stream with blocks.
 
@@ -162,10 +167,11 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
         """Cosine."""
         return self.map(np.cos)
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def copy(self):
         """Make a copy of the stream."""
-        pass
+        self._iterator, iterator = itertools.tee(self._iterator)
+        return self._construct(iterator)
 
     def cycle(self):
         """Cycle the stream.
@@ -176,8 +182,8 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
 
     @abc.abstractmethod
     def drop(self, n):
-        """Drop the first `n` samples."""
-        pass
+        """Drop the first `n` items."""
+        return self._construct(cytoolz.drop(n, self))
 
     def exp(self):
         """Exponential."""
@@ -224,9 +230,9 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
         return self.map(np.sqrt)
 
     @abc.abstractmethod
-    def take(self, nsamples):
-        """Take `nsamples` of stream."""
-        pass
+    def take(self, n):
+        """Take the first `n`."""
+        return self._construct(cytoolz.take(n, self._iterator))
 
     def tan(self):
         """Tangens."""
