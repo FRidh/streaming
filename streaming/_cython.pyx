@@ -68,3 +68,18 @@ def _filter_ba(object x, double[:] b, double[:] a, double[:] xd, double[:] yd, i
 
         xi = (xi+1)%nb
         yi = (yi+1)%na
+
+
+# Cython version of diff is 3x as fast
+def diff(object iterator, double initial_value=0.0):
+    """Differentiate `iterator`.
+    """
+    cdef double current, old
+    current = next(iterator)
+    while True:
+        old = current
+        current = next(iterator)
+        yield current-old
+
+
+

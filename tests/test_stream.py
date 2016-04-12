@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore", category=AmbiguityWarning)
 #with warnings.catch_warnings():
     #warnings.filterwarnings("ignore", category=AmbiguityWarning)
 import streaming
-from streaming._iterator import blocked
+from streaming._iterator import blocks
 from streaming.stream import *
 from streaming.itertools import *
 from streaming.operators import _BINARY_OPERATORS
@@ -149,7 +149,7 @@ class TestBlockStream(_TestAbstractStream):
 
     @pytest.fixture
     def stream(self, array, nblock):
-        return BlockStream(blocked(nblock, array), nblock)
+        return BlockStream(map(np.array, blocks(array, nblock)), nblock)
 
     @pytest.fixture(params=['mean', 'std', 'var'])
     def reduction(self, request):
@@ -171,12 +171,13 @@ class TestBlockStream(_TestAbstractStream):
 
     def test_cycle(self, stream, nsamples, nblock):
         nsamples = nsamples // nblock * nblock
-        out = stream.cycle().take(nsamples*2).toarray()
+        out = stream.cycle().samples().take(nsamples*2).toarray()
         assert np.allclose(out[0:nsamples], out[nsamples:])
 
     def test_peek(self, stream):
         first = stream.peek()
-        assert first == list(stream)[0][0] # First item in first block
+        print(list(stream.copy())[0])
+        assert np.allclose(first, list(stream)[0]) # First block
 
     def test_reductions(self, array, nblock, nsamples, stream, reduction):
         """Test reductions like `mean` and `std`.

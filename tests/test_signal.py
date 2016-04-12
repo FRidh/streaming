@@ -66,3 +66,26 @@ def test_vdl(signal, times, delay):
 
     delayed = streaming.signal.vdl(signal, times, delay)
     obtained = delayed.toarray()
+
+@pytest.fixture(params=[None, 128, 1024])
+def nblock_noise(request):
+    return request.param
+
+def test_noise(nblock_noise):
+    nblock = nblock_noise
+
+
+    seed = 100
+    state = np.random.RandomState(seed=seed)
+
+    if nblock is None:
+        nsamples = 1000
+    else:
+        nsamples = nblock * 4
+
+    stream = noise(nblock, state)
+    out = stream.samples().take(nsamples).toarray()
+
+    out_ref = state = np.random.RandomState(seed=seed).randn(nsamples)
+
+    assert np.allclose(out, out_ref)

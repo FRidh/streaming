@@ -209,8 +209,8 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
         return cytoolz.count(self.samples())
 
     def peek(self):
-        """Check the first element in the Stream."""
-        first, self._iterator = cytoolz.peek(self)
+        """Check the first item in the stream."""
+        first, self._iterator = cytoolz.peek(self._iterator)
         return first
 
     @abc.abstractmethod
@@ -283,13 +283,6 @@ def _(iterable, n=2):
 @cycle.register(AbstractStream)
 def _(iterable):
     return AbstractStream(iterable)(itertools.cycle(iterable))
-
-# Toolz
-
-@peek.register(AbstractStream)
-def _(seq):
-    first, seq = toolz.peek(seq.samples())
-    return first, AbtractStream(seq)
 
 # Other helpful functions
 

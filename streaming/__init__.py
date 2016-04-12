@@ -15,3 +15,4 @@ import streaming.stream
 import streaming.signal
 
 from streaming.stream import Stream, BlockStream
+from streaming.signal import constant, sine

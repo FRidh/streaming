@@ -11,6 +11,7 @@ import numpy as np
 import streaming
 from streaming.stream import Stream, BlockStream, count
 from scipy.signal import firwin
+import itertools
 
 def times(dt):
     if isinstance(dt, numbers.Number):
@@ -30,7 +31,9 @@ def convolve(signal, impulse_responses, nblock, ntaps=None, initial_values=None)
     .. seealso:: :func:`streaming._iterator.blocked_convolve`
     """
     signal = signal.blocks(nblock)
-    return BlockStream(streaming._iterator.blocked_convolve(signal, impulse_responses, nblock=nblock, ntaps=ntaps, initial_values=initial_values), nblock=nblock)
+    noverlap = 0
+    return BlockStream(streaming._iterator.blocked_convolve(signal.blocks(nblock)._iterator, impulse_responses._iterator, nblock=nblock,
+                                                            ntaps=ntaps, initial_values=initial_values), nblock=nblock, noverlap=noverlap)
 
 
 def vdl(signal, times, delay, initial_value=0.0):
@@ -61,6 +64,7 @@ def interpolate(x, y, xnew):
     """
     return Stream(streaming._iterator.interpolate_linear(x.samples()._iterator, y.samples()._iterator, xnew.samples()._iterator))
 
+
 def constant(value, nblock=None):
     """Stream with constant value.
 
@@ -71,6 +75,7 @@ def constant(value, nblock=None):
         return BlockStream([np.ones(nblock)*value], nblock).cycle()
     else:
         return Stream([value]).cycle()
+
 
 def sine(frequency, fs):
     """Sine with `frequency` and sample frequency `fs`.
@@ -83,25 +88,53 @@ def sine(frequency, fs):
     return np.sin(2.*np.pi*frequency*times(1./fs))
 
 
-def bandpass_filter(lowcut, highcut, fs, ntaps):
-    """Design bandpass FIR filter.
-    """
-    return firwin(ntaps, [lowcut, highcut], pass_zero=False, nyq=fs)
+def noise(nblock=None, state=None):
+    """Generate white noise with standard Gaussian distribution.
 
-def bandstop_filter(lowcut, highcut, fs, ntaps):
-    """Design bandstop FIR filter.
+    :param nblock: Amount of samples per block.
+    :param state: State of PRNG.
+    :type state: :class:`np.random.RandomState`
+    :returns: When `nblock=None`, individual samples are generated and a :class:`streaming.Stream` is
+    returned. When integer, a :class:`streaming.BlockStream` is returned.
     """
-    return firwin(ntaps, [lowcut, highcut], pass_zero=True, nyq=fs)
+    if state is None:
+        state = np.random.RandomState()
 
-def lowpass_filter(cut, fs, ntaps):
-    """Design lowpass FIR filter.
-    """
-    return firwin(ntaps, cut, pass_zero=True, nyq=fs)
+    if nblock is None:
+        # Return individual samples.
+        return Stream((state.randn(1)[0] for i in itertools.count()))
+    else:
+        # Return blocks.
+        return BlockStream((state.randn(nblock) for i in itertools.count()), nblock=nblock, noverlap=0)
 
-def highpass_filter(cut, fs, ntaps):
-    """Design highpass FIR filter.
+
+#def bandpass_filter(lowcut, highcut, fs, ntaps):
+    #"""Design bandpass FIR filter.
+    #"""
+    #return firwin(ntaps, [lowcut, highcut], pass_zero=False, nyq=fs)
+
+#def bandstop_filter(lowcut, highcut, fs, ntaps):
+    #"""Design bandstop FIR filter.
+    #"""
+    #return firwin(ntaps, [lowcut, highcut], pass_zero=True, nyq=fs)
+
+#def lowpass_filter(cut, fs, ntaps):
+    #"""Design lowpass FIR filter.
+    #"""
+    #return firwin(ntaps, cut, pass_zero=True, nyq=fs)
+
+#def highpass_filter(cut, fs, ntaps):
+    #"""Design highpass FIR filter.
+    #"""
+    #return firwin(ntaps, cut, pass_zero=False, nyq=fs)
+
+
+def cumsum(x):
+    """Cumulative sum.
+
+    .. seealso:: :func:`itertools.accumulate`
     """
-    return firwin(ntaps, cut, pass_zero=False, nyq=fs)
+    return Stream(streaming._iterator.cumsum(x.samples()._iterator))
 
 
 def diff(x):
@@ -113,6 +146,39 @@ def diff(x):
     .. seealso:: :func:`streaming._iterator.diff`
     """
     return Stream(streaming._iterator.diff(x.samples()._iterator))
+
+
+def filter_ba(x, b, a):
+    """Apply IIR filter to `x`.
+
+    :param x: Signal.
+    :param b: Numerator coefficients.
+    :param a: Denominator coefficients.
+    :returns: Filtered signal.
+
+    .. seealso:: :func:`scipy.signal.lfilter`
+    """
+    return Stream(streaming._iterator.filter_ba(x.samples()._iterator, b, a))
+
+
+def filter_sos(x, sos):
+    """Apply IIR filter to `x`.
+
+    :param x: Signal.
+    :param sos: Second-order sections.
+    :returns: Filtered signal.
+
+    .. seealso:: :func:`scipy.signal.sosfilt`
+
+    """
+    return Stream(streaming._iterator.filter_sos(x.samples()._iterator, sos))
+
+
+
+#def integrate(x):
+    #"""Integrate `x`.
+    #"""
+    #return
 
 
 

@@ -22,7 +22,6 @@ from streaming.abstractstream import *
 from streaming.itertools import *
 from streaming.toolz import *
 
-
 class Stream(AbstractStream):
     """Stream of samples.
     """
@@ -34,8 +33,9 @@ class Stream(AbstractStream):
     def nblock(self):
         raise AttributeError("Stream does not have a blocksize")
 
-    def blocks(self, nblock, kind=np.array):
-        return BlockStream(streaming._iterator.blocked(nblock, self._iterator, kind=kind), nblock)
+    def blocks(self, nblock, noverlap=0):
+        blocks = map(np.array, streaming._iterator.blocks(self._iterator, nblock, noverlap))
+        return BlockStream(blocks, nblock, noverlap)
 
     def drop(self, nsamples):
         """Drop the first `n` samples."""
@@ -56,7 +56,7 @@ class BlockStream(AbstractStream):
     """Stream of blocks of samples.
     """
 
-    def __init__(self, iterator, nblock):
+    def __init__(self, iterator, nblock, noverlap=0):
 
         # We either peek, and we know the type and blocksize assuming a homogeneous stream
         # or we don't and we need nblock as argument and hope the blocks are of the right type.
@@ -75,32 +75,47 @@ class BlockStream(AbstractStream):
 
         super().__init__(iterator)
 
+        if noverlap > nblock-1:
+            raise ValueError("`noverlap` should be smaller than `nblock-1`")
+
         self._nblock = nblock
+        self._noverlap = noverlap
 
     def _construct(self, iterator):
-        return BlockStream(iterator, self.nblock)
+        return BlockStream(iterator, self.nblock, self.noverlap)
 
     @property
     def nblock(self):
         return self._nblock
 
-    def blocks(self, nblock=None, kind=np.array):
+    @property
+    def noverlap(self):
+        return self._noverlap
+
+    def blocks(self, nblock=None, noverlap=None):
 
         if nblock is None:
-            return self
-        elif nblock == self._nblock:
-            return self
-        elif not nblock % self._nblock:
-            # new is multiple of current
-            factor = nblock // self.nblock
-            partitioned = map(np.concatenate, cytoolz.partition(n, self._iterator))
-            return type(self)(partitioned, nblock)
-        #elif not self._nblock % nblock:
-            ## current is multiple of new
-            #factor = self._nblock // nblock
+            nblock = self.nblock
+        if noverlap is None:
+            noverlap = self.noverlap
 
-        else:
-            return self.samples().blocks(nblock=nblock, kind=kind)
+        blocks = streaming._iterator.change_blocks(self._iterator, self.nblock, self.noverlap, nblock, noverlap)
+        return BlockStream(map(np.array, blocks), nblock, noverlap)
+
+        #if nblock==self.nblock and noverlap==self.noverlap:
+            #return self
+        #elif not nblock % self.nblock and noverlap==self.noverlap:
+            ## new is multiple of current
+            #factor = nblock // self.nblock
+            ## therefore we concat `factor` blocks into a new block
+            #partitioned = map(np.concatenate, cytoolz.partition(factor, self._iterator))
+            #return type(self)(partitioned, nblock, noverlap)
+        ##elif not self._nblock % nblock:
+            ### current is multiple of new
+            ##factor = self._nblock // nblock
+
+        #else:
+            #return self.samples().blocks(nblock=nblock, noverlap=noverlap)
 
     def drop(self, n):
         """Drop the first `n` blocks.
@@ -128,6 +143,14 @@ class BlockStream(AbstractStream):
         """
         return count(self)
 
+    #def select(self, selection):
+        #"""Select values from block.
+
+        #:param selection: Selection.
+        #:returns: :class:`Stream`
+        #"""
+        #return Stream(self.map(lambda x: x[selection]))
+
     def std(self):
         """Standard deviation calculated over `nblock` samples.
 
@@ -149,8 +172,18 @@ class BlockStream(AbstractStream):
 
     def samples(self):
         """Iterate over samples.
+
+        :returns: Stream of samples insteads of blocks. Possible overlap is taking into account.
+
         """
-        return Stream(itertools.chain.from_iterable(self._iterator))
+        return Stream(streaming._iterator.samples(self._iterator, self.nblock, self.noverlap))
+
+        #if self.noverlap==0:
+            #iterator = self._iterator
+        #else: # Take first nblock-noverlap samples of block
+            #nadvance = self.nblock - self.noverlap
+            #iterator = map(lambda x: x[0:nadvance], self._iterator)
+        #return Stream(itertools.chain.from_iterable(iterator))
 
     def var(self):
         """Variance calculated over `nblock` samples.
@@ -204,10 +237,12 @@ def _binary_op_object_blockstream(op, a, b):
 # Binary operators (Stream, BlockStream)
 def _binary_op_stream_blockstream(op, a, b):
     return op(a, b.samples())
+    #return Stream(map(op, a._iterator, b._iterator))
 
 # Binary operators (BlockStream, Stream)
 def _binary_op_blockstream_stream(op, a, b):
     return op(a.samples(), b)
+    #return BlockStream(map(op, a._iterator, b._iterator), a.nblock)
 
 for op in streaming.operators._BINARY_OPERATORS:
     # Get the dispatcher for this operation
@@ -249,19 +284,6 @@ def _(iterable):
 @toarray.register(BlockStream)
 def _(iterable):
     return iterable.samples().toarray()
-
-# Toolz
-
-@peek.register(Stream)
-def _(seq):
-    first, seq = cytoolz.peek(seq)
-    return first, Stream(seq)
-
-@peek.register(BlockStream)
-def _(seq):
-    nblock = seq.nblock
-    first, seq = cytoolz.peek(seq)
-    return first[0], BlockStream(seq, nblock=nblock)
 
 # Other helpful functions
 

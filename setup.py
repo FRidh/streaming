@@ -40,10 +40,10 @@ setup(
         'multipledispatch',
         'numpy',
         'scipy',
-        'toolz',
         ],
     classifiers=CLASSIFIERS,
     tests_require = [ 'pytest' ],
     cmdclass = {'test': PyTest},
     ext_modules=cythonize('streaming/*.pyx'),
+    include_dirs=[np.get_include()]
     )
