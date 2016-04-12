@@ -264,4 +264,93 @@ def vdl(signal, times, delay, initial_value=0.0):
     yield from cytoolz.drop(n, interpolated) # FIXME: move drop before interpolation, saves memory
 
 
-__all__ = ['blocked', 'blocked_convolve', 'convolve', 'diff', 'interpolate_linear', 'vdl']
+# Reference implementation
+
+def filter_ba_reference(x, b, a):
+    """Filter signal `x` with linear time-invariant IIR filter that has numerator coefficients `b` and denominator coefficients `a`.
+
+    :param b: Numerator coefficients.
+    :param a: Denominator coefficients. The first value is always a zero.
+    :param x: Signal.
+    :returns: Filtered signal.
+
+    This function applies a linear time-invariant IIR filter using the difference equation
+
+    .. math:: y[n] = -\sum_k=1^M a_k y[n-k] + \sum_k=0^(N-1) b_k x[n-k]
+
+    """
+    b = np.array(b)
+    a = np.array(a[1:])
+    na = len(a)
+    nb = len(b)
+
+    # Buffers
+    xd = collections.deque([0]*nb, nb)
+    yd = collections.deque([0]*na, na)
+
+    # Invert filter coefficients order
+    b = b[::-1]
+    a = a[::-1]
+
+    while True:
+        # Update inputs buffer with new signal value
+        xd.append(next(x))
+        # Calculate output from difference equation
+        result = -sum(a*yd) + sum(b*xd)
+        # Update outputs buffer with new output value
+        yd.append(result)
+        # Yield current output value
+        yield result
+
+
+def filter_ba(x, b, a):
+    """Apply IIR filter to `x`.
+
+    :param x: Signal.
+    :param b: Numerator coefficients.
+    :param a: Denominator coefficients.
+    :returns: Filtered signal.
+
+    .. seealso:: :func:`filter_sos` and :func:`scipy.signal.lfilter`
+    """
+    a = a[1:] # Drop the first value that is a one. See difference equation.
+
+    # Drop trailing zeros. They're not contributing and introduce a bug as well (leading zero in result).
+    while a[-1] == 0.0:
+        a = a[:-1]
+    while b[-1] == 0.0:
+        b = b[:-1]
+    a = np.array(a)
+    b = np.array(b)
+
+    na = len(a)
+    nb = len(b)
+
+    # Buffers
+    xd = np.zeros(nb)
+    yd = np.zeros(na)
+
+    yield from _filter_ba(x, b, a, xd, yd, nb, na)
+
+
+def filter_sos(x, sos):
+    """Apply IIR filter to `x`.
+
+    :param x: Signal.
+    :param sos: Second-order sections.
+    :returns: Filtered signal.
+
+    .. seealso:: :func:`filter_ba` and :func:`scipy.signal.sosfilt`
+
+    """
+    sos = np.atleast_2d(sos)
+    if sos.ndim != 2:
+        raise ValueError('sos array must be 2D')
+
+    n_sections, m = sos.shape
+    if m != 6:
+        raise ValueError('sos array must be shape (n_sections, 6)')
+
+    for section in sos:
+        x = filter_ba(x, section[:3], section[3:])
+    yield from x
