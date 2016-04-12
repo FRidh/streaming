@@ -1,8 +1,8 @@
-
 cimport cython
 
 @cython.boundscheck(False)
-def _interpolate_linear_cython(x, y, xnew):#, left=0.0, right=None):
+@cython.wraparound(False)
+def _interpolate_linear(object x, object y, object xnew):
     """Interpolate `y` for `x` at new positions `xnew`.
     """
     cdef double xl, yl, xr, yr, xnewi, ynewi
