@@ -32,6 +32,7 @@ import os
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -288,3 +289,9 @@ texinfo_documents = [
 
 
 autodoc_default_flags = ['members', 'show-inheritance']
+
+intersphinx_mapping = {'python': ('http://docs.python.org/3', None),
+                       'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+                       'np': ('http://docs.scipy.org/doc/numpy/', None),
+                       'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+                       }
