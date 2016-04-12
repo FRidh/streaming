@@ -146,6 +146,21 @@ def diff(iterator, initial_value=0.0):
         current = next(iterator)
         yield current-old
 
+def cumsum(iterator):
+    """Cumulative sum.
+
+    .. seealso:: :func:`itertools.accumulate` and :func:`np.cumsum`
+    """
+    yield from itertools.accumulate(iterator, operator.add)
+
+
+def cummul(iterator):
+    """Cumulative p.
+
+    .. seealso:: :func:`itertools.accumulate` and :func:`np.cumsum`
+    """
+    yield from itertools.accumulate(iterator, operator.mul)
+
 
 def vdl(signal, times, delay, initial_value=0.0):
     """Variable delay line which delays `signal` at 'times' with 'delay'.
