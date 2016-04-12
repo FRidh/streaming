@@ -12,6 +12,7 @@ import itertools
 import numpy as np
 import operator
 from ._cython import _interpolate_linear_cython as interpolate_linear
+from ._cython import _interpolate_linear as interpolate_linear
 
 try:
     from scipy.signal import fftconvolve as _convolve
