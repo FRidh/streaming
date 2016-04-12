@@ -18,10 +18,57 @@ try:
 except ImportError:
     _convolve = np.convolve
 
-def blocked(nblock, iterable, kind=np.array):
-    """Partition iterable into blocks of type `kind`. By default each block is cast to a :class:`np.ndarray`.
+def blocks(iterable, nblock, noverlap=0):
+    """Partition iterable into blocks.
 
+    :param iterable: Iterable.
     :param nblock: Samples per block.
+    :param noverlap: Amount of samples to overlap
+    :returns: Blocks.
+
+    """
+    # We use a different function for performance reasons
+    if noverlap==0:
+        return _blocks(iterable, nblock)
+    else:
+        return _overlapping_blocks(iterable, nblock, noverlap)
+
+
+def _blocks(iterable, nblock):
+    """Partition iterable into blocks.
+
+    :param iterable: Iterable.
+    :param nblock: Samples per block.
+    :returns: Blocks.
+
+    """
+    iterator = iter(iterable)
+    partitions = cytoolz.partition(nblock, iterator)
+    yield from partitions
+
+
+def _overlapping_blocks(iterable, nblock, noverlap):
+    """Partition iterable into overlapping blocks of size `nblock`.
+
+    :param iterable: Iterable.
+    :param nblock: Samples per block.
+    :param noverlap: Amount of samples to overlap.
+    :returns: Blocks.
+    """
+    iterator = iter(iterable)
+    nadvance = nblock - noverlap
+
+    if nadvance < 1:
+        raise ValueError("`noverlap` has to be smaller than `nblock-1`.")
+
+    # First `noverlap` samples
+    previous = list(cytoolz.take(noverlap, iterator))
+    advances = map(list, cytoolz.partition(nadvance, iterator))
+
+    for advance in advances:
+        block = previous + advance # Concat lists, change type.
+        yield block
+        previous = block[-noverlap:]
     :param iterable: Iterable.
     :param kind: Function to apply to each block of samples.
     """
