@@ -70,6 +70,49 @@ def _overlapping_blocks(iterable, nblock, noverlap):
         block = previous + advance # Concat lists, change type.
         yield block
         previous = block[-noverlap:]
+
+
+def change_blocks(iterator, nblock, noverlap, nblock_new, noverlap_new):
+    """Change blocksize and/or overlap of iterator.
+
+    :param iterator: Iterator.
+    :param nblock: Current blocksize.
+    :param noverlap: Current overlap.
+    :param nblock_new: New blocksize.
+    :param noverlap_new: New overlap.
+    :returns: Iterator with new blocksize and/or overlap.
+
+    """
+
+    # Same block size, same overlap
+    if nblock_new==nblock and noverlap_new==noverlap:
+        return iterator
+
+    # New block size is multiple of old block size, same overlap
+    elif not nblock_new % nblock and noverlap_new==noverlap:
+        # factor is multiple of current blocksize
+        factor = nblock_new // nblock
+        # therefore we concat `factor` blocks into a new block
+        partitioned = map(np.concatenate, cytoolz.partition(factor, iterator))
+        return partitioned
+
+    # Convert to samples and create blocks
+    else:
+        return blocks(samples(iterator, nblock, noverlap), nblock_new, noverlap_new)
+
+
+def samples(iterator, nblock, noverlap=0):
+    """Convert iterator with (overlapped) blocks to iterator with individual samples.
+
+    :param iterator: Iterator.
+    :param nblock: Samples per block
+    :param noverlap: Amount of samples to overlap
+    """
+    if noverlap!=0:
+        nadvance = nblock - noverlap
+        iterator = map(lambda x: x[0:nadvance], iterator)
+    yield from itertools.chain.from_iterable(iterator)
+
     :param iterable: Iterable.
     :param kind: Function to apply to each block of samples.
     """
