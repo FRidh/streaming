@@ -113,10 +113,41 @@ def samples(iterator, nblock, noverlap=0):
         iterator = map(lambda x: x[0:nadvance], iterator)
     yield from itertools.chain.from_iterable(iterator)
 
+
+# Some convenience functions
+
+def sliding_mean(iterable, nwindow, noverlap=0):
+    """Sliding mean.
+
     :param iterable: Iterable.
-    :param kind: Function to apply to each block of samples.
+    :param nwindow: Window size in samples.
+    :param noverlap: Amount of samples to overlap.
+    :returns: Iterable of means.
     """
-    yield from map(kind, cytoolz.partition(nblock, iterable))
+    yield from map(np.mean, blocks(iterable, nwindow, noverlap))
+
+
+def sliding_std(iterable, nwindow, noverlap=0):
+    """Sliding standard deviation.
+
+    :param iterable: Iterable.
+    :param nwindow: Window size in samples.
+    :param noverlap: Amount of samples to overlap.
+    :returns: Iterable of standard deviations.
+    """
+    yield from map(np.std, blocks(iterable, nwindow, noverlap))
+
+
+def sliding_var(iterable, nwindow, noverlap=0):
+    """Sliding variance.
+
+    :param iterable: Iterable.
+    :param nwindow: Window size in samples.
+    :param noverlap: Amount of samples to overlap.
+    :returns: Iterable of standard deviations.
+    """
+    yield from map(np.var, blocks(iterable, nwindow, noverlap))
+
 
 
 def convolve(signal, nblock, ir, initial_values=None):
