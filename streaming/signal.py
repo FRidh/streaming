@@ -10,7 +10,6 @@ import numbers
 import numpy as np
 import streaming
 from streaming.stream import Stream, BlockStream, count
-from scipy.signal import firwin
 import itertools
 
 def times(dt):
@@ -106,27 +105,6 @@ def noise(nblock=None, state=None):
     else:
         # Return blocks.
         return BlockStream((state.randn(nblock) for i in itertools.count()), nblock=nblock, noverlap=0)
-
-
-#def bandpass_filter(lowcut, highcut, fs, ntaps):
-    #"""Design bandpass FIR filter.
-    #"""
-    #return firwin(ntaps, [lowcut, highcut], pass_zero=False, nyq=fs)
-
-#def bandstop_filter(lowcut, highcut, fs, ntaps):
-    #"""Design bandstop FIR filter.
-    #"""
-    #return firwin(ntaps, [lowcut, highcut], pass_zero=True, nyq=fs)
-
-#def lowpass_filter(cut, fs, ntaps):
-    #"""Design lowpass FIR filter.
-    #"""
-    #return firwin(ntaps, cut, pass_zero=True, nyq=fs)
-
-#def highpass_filter(cut, fs, ntaps):
-    #"""Design highpass FIR filter.
-    #"""
-    #return firwin(ntaps, cut, pass_zero=False, nyq=fs)
 
 
 def cumsum(x):
