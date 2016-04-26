@@ -35,6 +35,22 @@ def convolve(signal, impulse_responses, nblock, ntaps=None, initial_values=None)
                                                             ntaps=ntaps, initial_values=initial_values), nblock=nblock, noverlap=noverlap)
 
 
+def convolve_overlap_add(signal, impulse_response, nblock):
+    """Convolve `signal` with linear time-invariant `impulse_response`.
+
+    :param signal: Signal. Partitioned in blocks of size `nblock`
+    :param impulse_response: Impulse response of linear time-invariant filter.
+    :param nblock: Blocksize of signal.
+
+    .. warning:: Time-invariant only.
+
+    .. seealso:: :func:`streaming._iterator.convolve_overlap_add`
+
+    """
+    signal = signal.blocks(nblock)
+    noverlap = 0
+    return BlockStream(streaming._iterator.convolve_overlap_add(signal._iterator, impulse_response, nblock), nblock=nblock, noverlap=noverlap)
+
 def vdl(signal, times, delay, initial_value=0.0):
     """Variable delay line which delays `signal` at `times` with `delay`.
 

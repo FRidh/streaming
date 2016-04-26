@@ -253,6 +253,39 @@ def blocked_convolve(signal, impulse_responses, nblock=None, ntaps=None, initial
         yield resulting_block
 
 
+def convolve_overlap_add(signal, impulse_response, nblock):
+    """Convolve `signal` with linear time-invariant `impulse_response`.
+
+    :param signal: Signal. Partitioned in blocks of size `nblock`
+    :param impulse_response: Impulse response of linear time-invariant filter.
+    :param nblock: Blocksize of signal.
+
+    .. warning:: Time-invariant only.
+
+    """
+    ntaps = len(impulse_response)
+    tail_previous_block = np.zeros(ntaps-1)
+
+    for block in signal:
+        # The result of the convolution consists of a head, a body and a tail
+        # - the head and tail have length `taps-1`
+        # - the body has length `signal-taps+1`??
+        try:
+            convolved = _convolve(block, impulse_response, mode='full')
+        except ValueError:
+            raise GeneratorExit
+
+        # The final block consists of
+        # - the head and body of the current convolution
+        # - and the tail of the previous convolution.
+        resulting_block = convolved[:-ntaps+1]
+        resulting_block[:ntaps-1] = resulting_block[:ntaps-1] + tail_previous_block # Because of possibly different dtypes
+        # We store the tail for the  next cycle
+        tail_previous_block = convolved[-ntaps+1:]
+
+        # Yield the result of this step
+        yield resulting_block
+
 def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_out=None):
     """Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.
 
