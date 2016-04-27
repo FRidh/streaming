@@ -296,6 +296,12 @@ def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_ou
     :returns: Convolution of `signal` with `impulse_response`.
     :rtype: Generator consisting of arrays.
 
+    Setting the input blocksize can be useful because this gives control over the delay of the process.
+    Setting the output blocksize is convenient because you know on beforehand the output blocksize.
+    Setting neither will result in blocksize of one, or individual samples. This will be slow.
+    Setting both is not possible.
+
+
     .. note:: The *overlap-discard* method is more commonly known as *overlap-save*.
 
     """
@@ -306,34 +312,53 @@ def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_ou
 
     # In the following block we create overlapping windows.
 
-    # We have sample-based signal and we want blocks with specified size out.
-    if nblock_in is None and nblock_out is not None:
+    # Both are set.
+    if nblock_in is not None and nblock_out is not None:
+        raise ValueError("Set block size of either input or output.")
+
+    # Only output blocksize is explicitly mentioned
+    elif nblock_out is not None:
         nblock_in = nblock_out + ntaps -1
-        windows = blocks(signal, nblock_in, noverlap)
-    # We have sample-based signal and we want samples out (actually blocks of size 1).
-    elif nblock_in is None and nblock_out is None:
-        nblock_in = ntaps
-        windows = blocks(signal, nblock_in, noverlap)
-    # We have block-based signal and we don't mind output block size
-    elif nblock_in is not None and nblock_out is None:
+    # Only input blocksize is explicitly mentioned
+    elif nblock_in is not None:
         if not nblock_in >= ntaps:
             raise ValueError("Amount of samples in block should be the same or more than the amount of filter taps.")
         nblock_out = nblock_in - ntaps + 1
-        windows = change_blocks(signal, nblock_in, 0, nblock_in, noverlap)
-    # We have block-based signal and we have specified an output block. We need to change the block size.
-    elif nblock_in is not None and nblock_out is not None:
-        if not nblock_in >= ntaps:
-            raise ValueError("Amount of samples in block should be the same or more than the amount of filter taps.")
-        nblock_in_new = nblock_out + ntaps -1
-        windows = change_blocks(signal, nblock_in, 0, nblock_in_new, noverlap, )
-        nblock_in = nblock_in_new
+    else:
+        nblock_in = ntaps
+        nblock_out = nblock_in - ntaps + 1
+
+    windows = blocks(signal, nblock_in, noverlap)
+
+    ## We have sample-based signal and we want blocks with specified size out.
+    #if nblock_in is None and nblock_out is not None:
+        #nblock_in = nblock_out + ntaps -1
+        #windows = blocks(signal, nblock_in, noverlap)
+    ## We have sample-based signal and we want samples out (actually blocks of size 1).
+    #elif nblock_in is None and nblock_out is None:
+        #nblock_in = ntaps
+        #windows = blocks(signal, nblock_in, noverlap)
+    ## We have block-based signal and we don't mind output block size
+    #elif nblock_in is not None and nblock_out is None:
+        #if not nblock_in >= ntaps:
+            #raise ValueError("Amount of samples in block should be the same or more than the amount of filter taps.")
+        #nblock_out = nblock_in - ntaps + 1
+        #windows = change_blocks(signal, nblock_in, 0, nblock_in, noverlap)
+    ## We have block-based signal and we have specified an output block. We need to change the block size.
+    #elif nblock_in is not None and nblock_out is not None:
+        #if not nblock_in >= ntaps:
+            #raise ValueError("Amount of samples in block should be the same or more than the amount of filter taps.")
+        #nblock_in_new = nblock_out + ntaps -1
+        #windows = change_blocks(signal, nblock_in, 0, nblock_in_new, noverlap, )
+        #nblock_in = nblock_in_new
 
     # Convolve function to use
     _convolve_func = lambda x: _convolve(x, impulse_response, mode='valid')
 
     # Convolved blocks
     convolved = map(_convolve_func, windows )
-    yield from convolved
+
+    return convolved, nblock_out
 
 
 def cumsum(iterator):
