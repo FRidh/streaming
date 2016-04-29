@@ -5,7 +5,6 @@ Stream
 The Stream module contains the classes :class:`Stream` and :class:`BlockStream`.
 
 """
-
 import collections
 import itertools
 import numpy as np
@@ -16,11 +15,10 @@ from multipledispatch.conflict import AmbiguityWarning
 import warnings
 warnings.filterwarnings("ignore", category=AmbiguityWarning)
 
-import streaming
+#import streaming
 from streaming.operators import *
 from streaming.abstractstream import *
 from streaming.itertools import *
-from streaming.toolz import *
 
 class Stream(AbstractStream):
     """Stream of samples.
@@ -295,13 +293,12 @@ def count(start=0, step=1):
     """
     return Stream(itertools.count(start=start, step=step))
 
-@repeat_item.register(Stream)
+@repeat_each.register(Stream)
 def _(iterable, n):
-    return Stream(repeat_item(iterable._iterator, n))
+    return Stream(repeat_each(iterable._iterator, n))
 
-@repeat_item.register(BlockStream)
+@repeat_each.register(BlockStream)
 def _(iterable, n):
-    return repeat_item(iterable.samples(), n).blocks(iterable.nblock)
+    return repeat_each(iterable.samples(), n).blocks(iterable.nblock)
 
-
-#__all__ = ['Stream', 'BlockStream']
+__all__ = ['Stream', 'BlockStream', 'count']

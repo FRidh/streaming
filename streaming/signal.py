@@ -11,45 +11,66 @@ import numpy as np
 import streaming
 from streaming.stream import Stream, BlockStream, count
 import itertools
+from functools import singledispatch
+from streaming._iterator import _convolve
 
-def times(dt):
-    if isinstance(dt, numbers.Number):
-        return count(step=dt)
+
+def constant(value, nblock=None):
+    """Stream with constant value.
+
+    :rtype: :class:`Stream` or :class:`BlockStream` if `nblock` is not `None`.
+    """
+
+    if nblock is not None:
+        return BlockStream([np.ones(nblock)*value], nblock).cycle()
     else:
-        raise ValueError("dt has to be a scalar number.")
+        return Stream([value]).cycle()
 
-def convolve(signal, impulse_responses, nblock, ntaps=None, initial_values=None):
+
+def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=None):
     """Convolve `signal` with `impulse_responses`.
 
     :param signal: Signal
     :type signal: :class:`Stream` or :class:`BlockStream`
     :param impulse_responses: :class:`Stream`
+    :param ntaps: Amount of taps.
     :returns: Convolution of `signal` with `impulse_responses`.
     :rtype: :class:`BlockStream`
 
     .. seealso:: :func:`streaming._iterator.blocked_convolve`
     """
-    signal = signal.blocks(nblock)
     noverlap = 0
-    return BlockStream(streaming._iterator.blocked_convolve(signal.blocks(nblock)._iterator, impulse_responses._iterator, nblock=nblock,
-                                                            ntaps=ntaps, initial_values=initial_values), nblock=nblock, noverlap=noverlap)
+    signal = signal.blocks(nhop, noverlap=noverlap)
+    return BlockStream(streaming._iterator.convolve_overlap_add(signal._iterator, impulse_responses._iterator, nhop=nhop, ntaps=ntaps,
+                                                       initial_values=initial_values), nblock=nhop, noverlap=noverlap)
+
+# Backwards compatibility
+convolve = convolve_overlap_add
 
 
-def convolve_overlap_add(signal, impulse_response, nblock):
-    """Convolve `signal` with linear time-invariant `impulse_response`.
+def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
+    """Convole signal with linear time-variant `impulse_responses` using overlap-save method.
 
-    :param signal: Signal. Partitioned in blocks of size `nblock`
-    :param impulse_response: Impulse response of linear time-invariant filter.
-    :param nblock: Blocksize of signal.
-
-    .. warning:: Time-invariant only.
-
-    .. seealso:: :func:`streaming._iterator.convolve_overlap_add`
+    :param signal: Signal.
+    :param impulse_responses: Impulse responses of the filter. Each impulse response belongs to a hop.
+    :param nhop: Hop in samples.
+    :param ntaps: Length of each impulse response.
+    :returns: Stream with blocksize equal to `nhop`.
+    :rtype: BlockStream
 
     """
-    signal = signal.blocks(nblock)
-    noverlap = 0
-    return BlockStream(streaming._iterator.convolve_overlap_add(signal._iterator, impulse_response, nblock), nblock=nblock, noverlap=noverlap)
+    #return BlockStream(streaming._iterator.convolve_overlap_save(signal.samples()._iterator, impulse_responses._iterator, nhop, ntaps), nblock=nhop)
+
+    # It can be more efficient to repeat code here, because with Stream/BlockStream we don't always need to convert from sample-based to block-based.
+    nwindow = nhop + ntaps - 1
+    noverlap = ntaps - 1
+    windows = signal.blocks(nblock=nwindow, noverlap=noverlap)
+    # Convolve function to use
+    _convolve_func = lambda x, y: _convolve(x, y, mode='valid')
+    # Convolved blocks
+    convolved = BlockStream(iter(map(_convolve_func, windows, impulse_responses )), nblock=nhop, noverlap=0)
+    return convolved
+
 
 def vdl(signal, times, delay, initial_value=0.0):
     """Variable delay line which delays `signal` at `times` with `delay`.
@@ -80,18 +101,6 @@ def interpolate(x, y, xnew):
     return Stream(streaming._iterator.interpolate_linear(x.samples()._iterator, y.samples()._iterator, xnew.samples()._iterator))
 
 
-def constant(value, nblock=None):
-    """Stream with constant value.
-
-    :rtype: :class:`Stream` or :class:`BlockStream` if `nblock` is not `None`.
-    """
-
-    if nblock is not None:
-        return BlockStream([np.ones(nblock)*value], nblock).cycle()
-    else:
-        return Stream([value]).cycle()
-
-
 def sine(frequency, fs):
     """Sine with `frequency` and sample frequency `fs`.
 
@@ -101,6 +110,13 @@ def sine(frequency, fs):
     :rtype: :class:`Stream`
     """
     return np.sin(2.*np.pi*frequency*times(1./fs))
+
+
+def times(dt):
+    if isinstance(dt, numbers.Number):
+        return count(step=dt)
+    else:
+        raise ValueError("dt has to be a scalar number.")
 
 
 def noise(nblock=None, state=None):
@@ -138,6 +154,7 @@ def diff(x):
     :rtype: :class:`Stream`
 
     .. seealso:: :func:`streaming._iterator.diff`
+    .. note:: Typically when differentiating one needs to multiple as well with the sample frequency
     """
     return Stream(streaming._iterator.diff(x.samples()._iterator))
 
@@ -168,7 +185,6 @@ def filter_sos(x, sos):
     return Stream(streaming._iterator.filter_sos(x.samples()._iterator, sos))
 
 
-
 #def integrate(x):
     #"""Integrate `x`.
     #"""
@@ -182,4 +198,4 @@ def filter_sos(x, sos):
         #pass
 
 
-#__all__ = ['constant', 'convolve', 'interpolate', 'sine', 'times', 'vdl']
+__all__ = ['constant', 'convolve', 'convolve_overlap_add', 'convolve_overlap_save', 'interpolate', 'noise', 'sine', 'times', 'vdl']

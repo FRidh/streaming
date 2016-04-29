@@ -66,7 +66,7 @@ def _overlapping_blocks(iterable, nblock, noverlap):
     advances = map(list, cytoolz.partition(nadvance, iterator))
 
     for advance in advances:
-        block = previous + advance # Concat lists, change type.
+        block = previous + advance # Concat lists
         yield block
         previous = block[-noverlap:]
 
@@ -93,6 +93,13 @@ def change_blocks(iterator, nblock, noverlap, nblock_new, noverlap_new):
         factor = nblock_new // nblock
         # therefore we concat `factor` blocks into a new block
         partitioned = map(np.concatenate, cytoolz.partition(factor, iterator))
+        return partitioned
+
+    # Old block size is multiple of new block size, sample overlap
+    elif not nblock % nblock_new and noverlap_new==noverlap:
+        factor = nblock // nblock_new
+        partition = lambda x: cytoolz.partition(factor, x)
+        partitioned = itertools.chain.from_iterable(map(partition, iterator))
         return partitioned
 
     # Convert to samples and create blocks
@@ -159,11 +166,11 @@ def convolve(signal, impulse_responses, nblock, ntaps=None, initial_values=None)
     :param ntaps: Length of impulse responses.
     :param initial_values. Value to use before convolution kicks in.
 
-    .. note:: This function takes samples and yields samples. It wraps :func:`blocked_convolve` and therefore requires a blocksize for computing the convolution.
+    .. note:: This function takes samples and yields samples. It wraps :func:`convolve_overlap_add` and therefore requires a blocksize for computing the convolution.
 
     """
     signal = blocks(signal, nblock)
-    convolved = blocked_convolve(signal, impulse_responses, nblock=nblock, ntaps=ntaps, initial_values=initial_values)
+    convolved = convolve_overlap_add(signal, impulse_responses, nblock=nblock, ntaps=ntaps, initial_values=initial_values)
     yield from itertools.chain.from_iterable(convolved)
 
 def _convolve_crossfade(block, ir1, ir2, fading1):
@@ -191,43 +198,44 @@ def _convolve_crossfade(block, ir1, ir2, fading1):
     return convolved
 
 
-def blocked_convolve(signal, impulse_responses, nblock=None, ntaps=None, initial_values=None, crossfade=False):
-    """Convolve iterable `signal` with time-variant `ir`.
+def convolve_overlap_add_spectra(signal, spectra, nblock, nbins, initial_values=None):
+    """Convolve iterable `signal` with impulse responses of `spectra.
+
+
+    This function directly uses the spectra to compute the acyclic convolution.
+
+    """
+    return NotImplemented
+
+def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=None):
+    """Convolve iterable `signal` with time-variant `impulse_responses`.
 
     :param signal: Signal in blocks of size `nblock`.
     :param impulse_responses: Impulse responses of length `ntaps`.
-    :param nblock: Samples per block.
+    :param nhop: Impulse responses is updated every `nhop` samples. This should correspond to the blocksize of `signal`.
     :param ntaps: Length of impulse responses.
     :param initial_values. Value to use before convolution kicks in.
-    :param crossfade: Crossfade convolutions with impulse responses of current and previous block.
     :returns: Convolution.
 
     This function implements the overlap-add method. Time-variant `impulse_responses is supported.
     Each item (`block`) in `signal` corresponds to an impulse response (`ir`) in `impulse_responses`.
+
+    This implementation of overlap-add buffers only one segment. Therefore, only `nblock>=ntaps` is supported.
+
+    .. warning:: This function cannot be used when `ntaps > nblock`.
+
+    .. seealso:: :func:`convolve_overlap_save`
+
     """
+    nblock = nhop
 
-    if nblock is None:
-        first_block, signal = cytoolz.peek(signal)
-        nblock = len(first_block)
-        del first_block
-    if ntaps is None:
-        first_ir, impulse_responses = cytoolz.peek(impulse_responses)
-        ntaps = len(first_ir)
-        del first_ir
-
-    ## In case the blocksize is smaller than the filter length.
-    #if ntaps > nblock:
-        #nblock, ntaps = max(nblock, ntaps), min(nblock, ntaps)
-        #print(nblock, ntaps)
-        #reverse = True
+    if not nblock >= ntaps:
+        raise ValueError("Amount of samples in block should be the same or more than the amount of filter taps.")
 
     if initial_values is None:
         tail_previous_block = np.zeros(ntaps-1)
     else:
         tail_previous_block = initial_values
-
-    if not nblock >= ntaps:
-        raise ValueError("Amount of samples in block should be the same or more than the amount of filter taps.")
 
     for block, ir in zip(signal, impulse_responses):
         # The result of the convolution consists of a head, a body and a tail
@@ -252,39 +260,6 @@ def blocked_convolve(signal, impulse_responses, nblock=None, ntaps=None, initial
         # Yield the result of this step
         yield resulting_block
 
-
-def convolve_overlap_add(signal, impulse_response, nblock):
-    """Convolve `signal` with linear time-invariant `impulse_response`.
-
-    :param signal: Signal. Partitioned in blocks of size `nblock`
-    :param impulse_response: Impulse response of linear time-invariant filter.
-    :param nblock: Blocksize of signal.
-
-    .. warning:: Time-invariant only.
-
-    """
-    ntaps = len(impulse_response)
-    tail_previous_block = np.zeros(ntaps-1)
-
-    for block in signal:
-        # The result of the convolution consists of a head, a body and a tail
-        # - the head and tail have length `taps-1`
-        # - the body has length `signal-taps+1`??
-        try:
-            convolved = _convolve(block, impulse_response, mode='full')
-        except ValueError:
-            raise GeneratorExit
-
-        # The final block consists of
-        # - the head and body of the current convolution
-        # - and the tail of the previous convolution.
-        resulting_block = convolved[:-ntaps+1]
-        resulting_block[:ntaps-1] = resulting_block[:ntaps-1] + tail_previous_block # Because of possibly different dtypes
-        # We store the tail for the  next cycle
-        tail_previous_block = convolved[-ntaps+1:]
-
-        # Yield the result of this step
-        yield resulting_block
 
 def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_out=None):
     """Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.
@@ -359,6 +334,28 @@ def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_ou
     convolved = map(_convolve_func, windows )
 
     return convolved, nblock_out
+
+
+def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
+    """Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.
+
+    :param signal: Signal. Consists of samples.
+    :param impulse_responses: Linear time-variant impulses response of filter.
+    :param nhop: Impulse response is renewed every `nhop` samples.
+    :returns: Convolution of `signal` with `impulse_responses`.
+    :rtype: Generator consisting of arrays.
+
+    .. note:: The *overlap-discard* method is more commonly known as *overlap-save*.
+
+    """
+    nwindow = nhop + ntaps - 1
+    noverlap = ntaps - 1
+    windows = blocks(signal, nwindow, noverlap)
+    # Convolve function to use
+    _convolve_func = lambda x, y: _convolve(x, y, mode='valid')
+    # Convolved blocks
+    convolved = map(_convolve_func, windows, impulse_responses )
+    yield from convolved
 
 
 def cumsum(iterator):
@@ -512,4 +509,4 @@ def filter_sos(x, sos):
     yield from x
 
 
-__all__ = ['blocks', 'blocked_convolve', 'convolve', 'convolve_overlap_discard', 'diff', 'interpolate_linear', 'filter_ba', 'filter_ba_reference', 'filter_sos', 'vdl']
+__all__ = ['blocks', 'convolve_overlap_add', 'convolve', 'convolve_overlap_discard', 'diff', 'interpolate_linear', 'filter_ba', 'filter_ba_reference', 'filter_sos', 'vdl']

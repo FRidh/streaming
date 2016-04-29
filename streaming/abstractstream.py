@@ -18,9 +18,7 @@ warnings.filterwarnings("ignore", category=AmbiguityWarning)
 import streaming
 from streaming.operators import *
 from streaming.itertools import *
-from streaming.toolz import *
 
-import toolz
 import cytoolz
 #from streaming.operators import _basic_objects
 
@@ -213,6 +211,12 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
         first, self._iterator = cytoolz.peek(self._iterator)
         return first
 
+    def repeat_each(self, n):
+        """Repeat each item `n` times before yielding the next.
+
+        """
+        return repeat_each(self, n)
+
     @abc.abstractmethod
     def samples(self):
         """Stream with samples.
@@ -233,6 +237,10 @@ class AbstractStream(collections.Iterator, metaclass=Operators):
     def take(self, n):
         """Take the first `n`."""
         return self._construct(cytoolz.take(n, self._iterator))
+
+    def take_nth(self, n):
+        """Take every `n`th."""
+        return self._construct(cytoolz.take_nth(n, self._iterator))
 
     def tan(self):
         """Tangens."""
@@ -289,6 +297,6 @@ def _(iterable):
 def count(start=0, step=1):
     return AbstractStream(itertools.count(start=start, step=step))
 
-@repeat_item.register(AbstractStream)
+@repeat_each.register(AbstractStream)
 def _(iterable, n):
-    return AbstractStream(repeat_item(iterable._iterator, n))
+    return AbstractStream(repeat_each(iterable._iterator, n))

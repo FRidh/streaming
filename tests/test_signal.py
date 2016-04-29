@@ -18,74 +18,109 @@ def blocked(request):
     return request.param
 
 @pytest.fixture
-def samples():
+def nsamples():
     return 5000
 
 @pytest.fixture
-def signal_array(samples):
-    return np.arange(samples)
+def sequence(nsamples):
+    return np.arange(nsamples)
 
 @pytest.fixture
-def signal(signal_array, blocked, nblock):
-    signal = Stream(signal_array)
+def stream(sequence, blocked, nblock):
+    stream = Stream(sequence)
     if blocked:
-        signal = signal.blocks(nblock)
-    return signal
+        stream = stream.blocks(nblock)
+    return stream
 
 @pytest.fixture(params=[True, False])
 def time_variant(request):
     return request.param
 
+@pytest.fixture(params=[10, 32, 64])
+def ntaps(request):
+    return request.param
+
 @pytest.fixture
-def impulse_responses(samples, nblock, time_variant):
-    taps = 64
+def impulse_responses(nsamples, ntaps, nblock, time_variant):
     if time_variant: # Unique IR for each block
-        nblocks = samples // nblock
-        return Stream(iter(np.random.randn(nblocks, taps)))
+        nblocks = nsamples // nblock
+        return Stream(iter(np.random.randn(nblocks, ntaps)))
     else: # Same IR for each block
-        return Stream(itertools.cycle([np.random.randn(taps)]))
-    return request.param
-
-
-def test_convolve(signal, impulse_responses, nblock, samples):
-    out = convolve(signal, impulse_responses, nblock)
-    assert isinstance(out, BlockStream)
-    out_array = out.toarray()
-    assert len(out_array) == samples // nblock * nblock
-
+        return Stream(itertools.cycle([np.random.randn(ntaps)]))
 
 @pytest.fixture
-def times(samples):
-    return Stream(range(samples))
+def impulse_response(ntaps):
+    return np.random.randn(ntaps)
+
+
+def test_convolve_overlap_add_invariant(sequence, stream, impulse_response, nsamples, nblock, ntaps):
+    nhop = nblock
+    # Compute convolutions
+    obtained = convolve_overlap_add(stream, constant(impulse_response), nhop, ntaps).toarray()
+    reference = np.convolve(sequence, impulse_response, mode='valid')
+
+    reference_length = nsamples - ntaps + 1
+    obtained_length = nsamples // nblock * nblock
+    length = min(reference_length, obtained_length)
+
+    #print(len(obtained), len(reference), obtained_length, reference_length)
+    assert len(obtained) == obtained_length
+    assert len(reference) == reference_length
+    assert np.allclose(obtained[ntaps:length-ntaps], reference[ntaps:length-ntaps])
+
+
+def test_convolve_overlap_save_invariant(sequence, stream, impulse_response, nsamples, nblock, ntaps):
+    """Test :func:`convolve_overlap_save` in the case of a time-invariant filter.
+    """
+    nhop = nblock
+    nwindow = nhop + ntaps - 1
+    obtained = convolve_overlap_save(stream, constant(impulse_response), nhop, ntaps).toarray()
+    reference = np.convolve(sequence, impulse_response, mode='valid')
+
+    # Length of obtained is always a bit smaller. Let's compute actual length.
+    reference_length = nsamples - ntaps + 1
+    obtained_length = (nsamples // nhop * nhop )# // nblock * nblock) // nhop * nhop
+
+    obtained_length = ((nsamples // nblock * nblock) - ntaps + 1) // nhop * nhop
+
+    length = min(reference_length, obtained_length)
+    print(reference_length, obtained_length, len(obtained), len(reference))
+    assert len(obtained) == obtained_length
+    assert len(reference) == reference_length
+    assert np.allclose(obtained[ntaps:length-ntaps], reference[ntaps:length-ntaps])
 
 @pytest.fixture
-def delay(samples):
-    return Stream(np.ones(samples) * 0.1 + np.arange(samples) * 0.001)
+def times(nsamples):
+    return Stream(range(nsamples))
 
-def test_vdl(signal, times, delay):
+@pytest.fixture
+def delay(nsamples):
+    return Stream(np.ones(nsamples) * 0.1 + np.arange(nsamples) * 0.001)
 
-    delayed = streaming.signal.vdl(signal, times, delay)
-    obtained = delayed.toarray()
+#def test_vdl(stream, times, delay):
 
-@pytest.fixture(params=[None, 128, 1024])
-def nblock_noise(request):
-    return request.param
+    #delayed = streaming.signal.vdl(stream, times, delay)
+    #obtained = delayed.toarray()
 
-def test_noise(nblock_noise):
-    nblock = nblock_noise
+#@pytest.fixture(params=[None, 128, 1024])
+#def nblock_noise(request):
+    #return request.param
+
+#def test_noise(nblock_noise):
+    #nblock = nblock_noise
 
 
-    seed = 100
-    state = np.random.RandomState(seed=seed)
+    #seed = 100
+    #state = np.random.RandomState(seed=seed)
 
-    if nblock is None:
-        nsamples = 1000
-    else:
-        nsamples = nblock * 4
+    #if nblock is None:
+        #nsamples = 1000
+    #else:
+        #nsamples = nblock * 4
 
-    stream = noise(nblock, state)
-    out = stream.samples().take(nsamples).toarray()
+    #stream = noise(nblock, state)
+    #out = stream.nsamples().take(nsamples).toarray()
 
-    out_ref = state = np.random.RandomState(seed=seed).randn(nsamples)
+    #out_ref = state = np.random.RandomState(seed=seed).randn(nnsamples)
 
-    assert np.allclose(out, out_ref)
+    #assert np.allclose(out, out_ref)

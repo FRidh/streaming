@@ -39,9 +39,9 @@ def toarray(iterable):
     return np.array(list(iterable))
 
 @singledispatch
-def repeat_item(iterable, n):
+def repeat_each(iterable, n):
     """Repeat items in `iterable` `n` times."""
     yield from itertools.chain.from_iterable(map(lambda i: itertools.repeat(i, n), iterable))
 
 
-__all__ = ['cycle', 'tee', 'repeat_item', 'toarray']
+__all__ = ['cycle', 'tee', 'repeat_each', 'toarray']

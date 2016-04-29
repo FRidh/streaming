@@ -129,61 +129,79 @@ def test_filter_sos():
 
 class TestConvolveOverlapDiscard(object):
 
-    def test_blocks_blocks(self):
-        """Signal is block-based and an output blocksize is given."""
+    def test_samples_nblock_in(self):
+        """Input blocksize is given."""
+        pass
+
+    def test_samples_nblock_out(self):
+        """Output blocksize is given."""
+        pass
+
+    def test_samples_nblock_in_nblock_out(self):
+        """Both input and output blocksize are given."""
+        pass
+
+    def test_samples(self):
+        """Both input and output blocksize are NOT given."""
         signal = np.random.randn(100)
         ir = np.random.randn(5)
-        nblock_out = 4
-        nblock_in = 7
+        pass
 
-        #nblocks_in = len(signal) // nblock_in
-        #nsamples_in = nblocks_in * nblock_in
-        #nblocks_out = nsamples_in // nblock_out
-        #nsamples_out = nblocks_out * nblock_out
-        #print(nsamples_out)
-        nsamples_out = 92 # FIXME
+    #def test_blocks_blocks(self):
+        #"""Signal is block-based and an output blocksize is given."""
+        #signal = np.random.randn(100)
+        #ir = np.random.randn(5)
+        #nblock_out = 4
+        #nblock_in = 7
 
-        out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(blocks(iter(signal), nblock_in), ir, nblock_in=nblock_in, nblock_out=nblock_out))))
-        reference = np.convolve(signal, ir, mode='valid')[:nsamples_out]
-        assert np.allclose(out, reference)
+        ##nblocks_in = len(signal) // nblock_in
+        ##nsamples_in = nblocks_in * nblock_in
+        ##nblocks_out = nsamples_in // nblock_out
+        ##nsamples_out = nblocks_out * nblock_out
+        ##print(nsamples_out)
+        #nsamples_out = 92 # FIXME
 
-
-    def test_blocks_whatever(self):
-        """Signal is block-based and an output blocksize is not given."""
-        signal = np.random.randn(100)
-        ir = np.random.randn(5)
-        nblock_in = 7
-
-        nsamples_out = 93 #FIXME
-
-        out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(blocks(iter(signal), nblock_in), ir, nblock_in=nblock_in))))
-        reference = np.convolve(signal, ir, mode='valid')[:nsamples_out]
-        assert np.allclose(out, reference)
-
-    def test_samples_blocks(self):
-        """Signal is sample-based and an output blocksize is given."""
-        signal = np.random.randn(100)
-        ir = np.random.randn(5)
-        nblock_out = 4
-
-        nsamples_out = len(signal) - len(ir) + 1
-        nblocks = nsamples_out // nblock_out
-        nsamples_out = nblocks * nblock_out
-
-        out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(iter(signal), ir, nblock_out=nblock_out))))
-        reference = np.convolve(signal, ir, mode='valid')[:nsamples_out]
-        assert np.allclose(out, reference)
+        #out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(blocks(iter(signal), nblock_in), ir, nblock_in=nblock_in, nblock_out=nblock_out))))
+        #reference = np.convolve(signal, ir, mode='valid')[:nsamples_out]
+        #assert np.allclose(out, reference)
 
 
-    def test_samples_samples(self):
-        """Signal is sample-based and output is samples as well."""
-        signal = np.random.randn(100)
-        ir = np.random.randn(5)
-        # That means block_out will be set to 1 in the function
-        nblock_out = 1
+    #def test_blocks_whatever(self):
+        #"""Signal is block-based and an output blocksize is not given."""
+        #signal = np.random.randn(100)
+        #ir = np.random.randn(5)
+        #nblock_in = 7
+
+        #nsamples_out = 93 #FIXME
+
+        #out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(blocks(iter(signal), nblock_in), ir, nblock_in=nblock_in))))
+        #reference = np.convolve(signal, ir, mode='valid')[:nsamples_out]
+        #assert np.allclose(out, reference)
+
+    #def test_samples_blocks(self):
+        #"""Signal is sample-based and an output blocksize is given."""
+        #signal = np.random.randn(100)
+        #ir = np.random.randn(5)
+        #nblock_out = 4
 
         #nsamples_out = len(signal) - len(ir) + 1
-        out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(iter(signal), ir))))
-        reference = np.convolve(signal, ir, mode='valid')
-        assert np.allclose(out, reference)
+        #nblocks = nsamples_out // nblock_out
+        #nsamples_out = nblocks * nblock_out
+
+        #out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(iter(signal), ir, nblock_out=nblock_out))))
+        #reference = np.convolve(signal, ir, mode='valid')[:nsamples_out]
+        #assert np.allclose(out, reference)
+
+
+    #def test_samples_samples(self):
+        #"""Signal is sample-based and output is samples as well."""
+        #signal = np.random.randn(100)
+        #ir = np.random.randn(5)
+        ## That means block_out will be set to 1 in the function
+        #nblock_out = 1
+
+        ##nsamples_out = len(signal) - len(ir) + 1
+        #out = np.array(list(itertools.chain.from_iterable(convolve_overlap_discard(iter(signal), ir))))
+        #reference = np.convolve(signal, ir, mode='valid')
+        #assert np.allclose(out, reference)
 

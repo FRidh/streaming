@@ -2,6 +2,7 @@
 """
 import pytest
 import multipledispatch
+from multipledispatch import dispatch
 from multipledispatch.conflict import AmbiguityWarning
 import numpy as np
 import warnings
@@ -12,6 +13,7 @@ warnings.filterwarnings("ignore", category=AmbiguityWarning)
 import streaming
 from streaming._iterator import blocks
 from streaming.stream import *
+from streaming.abstractstream import AbstractStream
 from streaming.itertools import *
 from streaming.operators import _BINARY_OPERATORS
 
@@ -114,6 +116,9 @@ class _TestAbstractStream(_TestOperators):
         assert isinstance(out, Stream)
         list(out)
 
+
+    def test_take_nth(self, stream):
+        list(stream.take_nth(3))
 
 class TestStream(_TestAbstractStream):
     """Tests specific to Stream.
