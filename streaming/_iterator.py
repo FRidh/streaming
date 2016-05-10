@@ -97,8 +97,9 @@ def change_blocks(iterator, nblock, noverlap, nblock_new, noverlap_new):
 
     # Old block size is multiple of new block size, sample overlap
     elif not nblock % nblock_new and noverlap_new==noverlap:
-        factor = nblock // nblock_new
-        partition = lambda x: cytoolz.partition(factor, x)
+        # Partition each block in blocks with size nblock_new
+        partition = lambda x: cytoolz.partition(nblock_new, x)
+        # And chain the iterables
         partitioned = itertools.chain.from_iterable(map(partition, iterator))
         return partitioned
 
