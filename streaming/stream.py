@@ -90,30 +90,10 @@ class BlockStream(AbstractStream):
     def noverlap(self):
         return self._noverlap
 
-    def blocks(self, nblock=None, noverlap=None):
-
-        if nblock is None:
-            nblock = self.nblock
-        if noverlap is None:
-            noverlap = self.noverlap
+    def blocks(self, nblock, noverlap=0):
 
         blocks = streaming._iterator.change_blocks(self._iterator, self.nblock, self.noverlap, nblock, noverlap)
         return BlockStream(map(np.array, blocks), nblock, noverlap)
-
-        #if nblock==self.nblock and noverlap==self.noverlap:
-            #return self
-        #elif not nblock % self.nblock and noverlap==self.noverlap:
-            ## new is multiple of current
-            #factor = nblock // self.nblock
-            ## therefore we concat `factor` blocks into a new block
-            #partitioned = map(np.concatenate, cytoolz.partition(factor, self._iterator))
-            #return type(self)(partitioned, nblock, noverlap)
-        ##elif not self._nblock % nblock:
-            ### current is multiple of new
-            ##factor = self._nblock // nblock
-
-        #else:
-            #return self.samples().blocks(nblock=nblock, noverlap=noverlap)
 
     def drop(self, n):
         """Drop the first `n` blocks.
@@ -141,14 +121,6 @@ class BlockStream(AbstractStream):
         """
         return count(self)
 
-    #def select(self, selection):
-        #"""Select values from block.
-
-        #:param selection: Selection.
-        #:returns: :class:`Stream`
-        #"""
-        #return Stream(self.map(lambda x: x[selection]))
-
     def std(self):
         """Standard deviation calculated over `nblock` samples.
 
@@ -175,13 +147,6 @@ class BlockStream(AbstractStream):
 
         """
         return Stream(streaming._iterator.samples(self._iterator, self.nblock, self.noverlap))
-
-        #if self.noverlap==0:
-            #iterator = self._iterator
-        #else: # Take first nblock-noverlap samples of block
-            #nadvance = self.nblock - self.noverlap
-            #iterator = map(lambda x: x[0:nadvance], self._iterator)
-        #return Stream(itertools.chain.from_iterable(iterator))
 
     def var(self):
         """Variance calculated over `nblock` samples.

@@ -17,9 +17,9 @@ def nblock(request):
 def blocked(request):
     return request.param
 
-@pytest.fixture
-def nsamples():
-    return 5000
+@pytest.fixture(params=[5000, 8000])
+def nsamples(request):
+    return request.param
 
 @pytest.fixture
 def sequence(nsamples):
