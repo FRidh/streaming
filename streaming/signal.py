@@ -8,11 +8,13 @@ The Signal Processing module contains functions for signal processing.
 from multipledispatch import dispatch, Dispatcher
 import numbers
 import numpy as np
+import noisy
 import streaming
 from streaming.stream import Stream, BlockStream, count
 import itertools
 from functools import singledispatch
 from streaming._iterator import _convolve
+
 
 
 def constant(value, nblock=None):
@@ -119,7 +121,9 @@ def times(dt):
         raise ValueError("dt has to be a scalar number.")
 
 
-def noise(nblock=None, state=None):
+
+
+def noise(nblock=None, state=None, color='white', ntaps=None):
     """Generate white noise with standard Gaussian distribution.
 
     :param nblock: Amount of samples per block.
@@ -131,12 +135,30 @@ def noise(nblock=None, state=None):
     if state is None:
         state = np.random.RandomState()
 
+    # Generate white noise
     if nblock is None:
-        # Return individual samples.
-        return Stream((state.randn(1)[0] for i in itertools.count()))
+        # Generate individual samples.
+        stream = Stream((state.randn(1)[0] for i in itertools.count()))
     else:
-        # Return blocks.
-        return BlockStream((state.randn(nblock) for i in itertools.count()), nblock=nblock, noverlap=0)
+        # Generate blocks.
+        stream = BlockStream((state.randn(nblock) for i in itertools.count()), nblock=nblock, noverlap=0)
+
+    # Apply filter for specific color
+    if color is not 'white':
+        if ntaps is None:
+            raise ValueError("Amount of taps has not been specified.")
+        ir = noisy.COLORS[color](ntaps)
+        if nblock is None:
+            nhop = ntaps
+        else:
+            nhop = max(nblock, ntaps)
+        stream = convolve_overlap_add(stream, constant(ir), nhop, ntaps).samples().drop(ntaps//2)
+
+    # Output as desired
+    if nblock is None:
+        return stream.samples()
+    else:
+        return stream.blocks(nblock)
 
 
 def cumsum(x):
@@ -183,6 +205,8 @@ def filter_sos(x, sos):
 
     """
     return Stream(streaming._iterator.filter_sos(x.samples()._iterator, sos))
+
+
 
 
 #def integrate(x):

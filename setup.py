@@ -39,6 +39,7 @@ setup(
         'cytoolz',
         'multipledispatch',
         'numpy',
+        'noisy',
         ],
     classifiers=CLASSIFIERS,
     tests_require = [ 'pytest', 'scipy' ],
