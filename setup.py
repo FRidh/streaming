@@ -21,13 +21,12 @@ CLASSIFIERS = [
     'Programming Language :: Cython',
     'Programming Language :: Python :: 3 :: Only',
     'Programming Language :: Python :: 3.5',
-
     'Topic :: Scientific/Engineering',
     ]
 
 setup(
     name='streaming',
-    version='0.0',
+    version='0.1',
     description="Streaming data with Python",
     author='Frederik Rietdijk',
     author_email='freddyrietdijk@fridh.nl',
