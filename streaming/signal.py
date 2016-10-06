@@ -51,7 +51,7 @@ convolve = convolve_overlap_add
 
 
 def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
-    """Convole signal with linear time-variant `impulse_responses` using overlap-save method.
+    """Convolve signal with linear time-variant `impulse_responses` using overlap-save method.
 
     :param signal: Signal.
     :param impulse_responses: Impulse responses of the filter. Each impulse response belongs to a hop.
