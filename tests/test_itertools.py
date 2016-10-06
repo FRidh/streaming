@@ -13,11 +13,11 @@ class TestIterable:
         cycled = list(cytoolz.take(nsamples*2, cycled_stream))
         assert np.allclose( cycled[0:nsamples], cycled[nsamples:])
 
-    def test_repeat_item(self):
+    def test_repeat_each(self):
         nsamples = 10
         nrepeats = 5
         stream = range(nsamples)
-        repeated_stream = list(repeat_item(stream, nrepeats))
+        repeated_stream = list(repeat_each(stream, nrepeats))
         # Check whether the elements indeed repeat.
         assert np.allclose(repeated_stream[0::5], repeated_stream[3::5])
 
@@ -25,11 +25,11 @@ class TestIterable:
 
 class TestStream:
 
-    def test_repeat_item(self):
+    def test_repeat_each(self):
         nsamples = 10
         nrepeats = 5
         stream = Stream(range(nsamples))
-        repeated_stream = repeat_item(stream, nrepeats)
+        repeated_stream = repeat_each(stream, nrepeats)
         assert type(repeated_stream) is type(stream)
         repeated_stream = list(repeated_stream)
         # Check whether the elements indeed repeat.
@@ -38,12 +38,12 @@ class TestStream:
 
 class TestBlockStream:
 
-    def test_repeat_item(self):
+    def test_repeat_each(self):
         nsamples = 10
         nrepeats = 5
         nblock = 4
         stream = Stream(range(nsamples)).blocks(nblock)
-        repeated_stream = repeat_item(stream, nrepeats)
+        repeated_stream = repeat_each(stream, nrepeats)
         assert type(repeated_stream) is type(stream)
         repeated_stream = list(repeated_stream.samples())
         # Check whether the elements indeed repeat.
