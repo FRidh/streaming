@@ -38,7 +38,7 @@ or
 
 ## Documentation
 
-The latest version of the documentation can be found at [ReadTheDocs](http://streaming.readthedocs.io/en/latest/).
+The latest version of the documentation can be found at http://fridh.github.io/streaming/.
 
 ## License
 
