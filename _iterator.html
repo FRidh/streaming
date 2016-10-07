@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>&lt;no title&gt; &#8212; streaming 0.1 documentation</title>
+    <title>Iterator &#8212; streaming 0.1 documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -24,7 +24,7 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <link rel="top" title="streaming 0.1 documentation" href="index.html" />
-    <link rel="prev" title="&lt;no title&gt;" href="signal.html" />
+    <link rel="prev" title="Signal Processing" href="signal.html" />
    
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
@@ -37,7 +37,234 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  
+  <span class="target" id="module-streaming._iterator"></span><div class="section" id="iterator">
+<h1>Iterator<a class="headerlink" href="#iterator" title="Permalink to this headline">¶</a></h1>
+<p>The <code class="xref py py-mod docutils literal"><span class="pre">streaming.iterator</span></code> module is a private module. Most algorithms for streams are implemented here using basic iterators.</p>
+<dl class="function">
+<dt id="streaming._iterator.blocks">
+<code class="descclassname">streaming._iterator.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>iterable</em>, <em>nblock</em>, <em>noverlap=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#blocks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.blocks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Partition iterable into blocks.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>iterable</strong> &#8211; Iterable.</li>
+<li><strong>nblock</strong> &#8211; Samples per block.</li>
+<li><strong>noverlap</strong> &#8211; Amount of samples to overlap</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Blocks.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.convolve_overlap_add">
+<code class="descclassname">streaming._iterator.</code><code class="descname">convolve_overlap_add</code><span class="sig-paren">(</span><em>signal</em>, <em>impulse_responses</em>, <em>nhop</em>, <em>ntaps</em>, <em>initial_values=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#convolve_overlap_add"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.convolve_overlap_add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convolve iterable <cite>signal</cite> with time-variant <cite>impulse_responses</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>signal</strong> &#8211; Signal in blocks of size <cite>nblock</cite>.</li>
+<li><strong>impulse_responses</strong> &#8211; Impulse responses of length <cite>ntaps</cite>.</li>
+<li><strong>nhop</strong> &#8211; Impulse responses is updated every <cite>nhop</cite> samples. This should correspond to the blocksize of <cite>signal</cite>.</li>
+<li><strong>ntaps</strong> &#8211; Length of impulse responses.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>:param initial_values. Value to use before convolution kicks in.
+:returns: Convolution.</p>
+<p>This function implements the overlap-add method. Time-variant <cite>impulse_responses is supported.
+Each item (`block</cite>) in <cite>signal</cite> corresponds to an impulse response (<cite>ir</cite>) in <cite>impulse_responses</cite>.</p>
+<p>This implementation of overlap-add buffers only one segment. Therefore, only <cite>nblock&gt;=ntaps</cite> is supported.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">This function cannot be used when <cite>ntaps &gt; nblock</cite>.</p>
+</div>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><code class="xref py py-func docutils literal"><span class="pre">convolve_overlap_save()</span></code></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.convolve">
+<code class="descclassname">streaming._iterator.</code><code class="descname">convolve</code><span class="sig-paren">(</span><em>signal</em>, <em>impulse_responses</em>, <em>nblock</em>, <em>ntaps=None</em>, <em>initial_values=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#convolve"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.convolve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convolve signal with impulse response.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>signal</strong> &#8211; Signal, not in blocks.</li>
+<li><strong>impulse_responses</strong> &#8211; Impulse responses of length <cite>ntaps</cite>.</li>
+<li><strong>nblock</strong> &#8211; Blocksize to use for the convolution.</li>
+<li><strong>ntaps</strong> &#8211; Length of impulse responses.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>:param initial_values. Value to use before convolution kicks in.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This function takes samples and yields samples. It wraps <a class="reference internal" href="#streaming._iterator.convolve_overlap_add" title="streaming._iterator.convolve_overlap_add"><code class="xref py py-func docutils literal"><span class="pre">convolve_overlap_add()</span></code></a> and therefore requires a blocksize for computing the convolution.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.convolve_overlap_discard">
+<code class="descclassname">streaming._iterator.</code><code class="descname">convolve_overlap_discard</code><span class="sig-paren">(</span><em>signal</em>, <em>impulse_response</em>, <em>nblock_in=None</em>, <em>nblock_out=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#convolve_overlap_discard"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.convolve_overlap_discard" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convolve signal with linear time-invariant <cite>impulse_response</cite> using overlap-discard method.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>signal</strong> &#8211; Signal. Can either consists of blocks or samples. <cite>nblock_in</cite> should be set to the block size of the signal.</li>
+<li><strong>impulse_response</strong> &#8211; Linear time-invariant impulse response of filter.</li>
+<li><strong>nblock_in</strong> &#8211; Actual input blocksize of signal. Should be set to <cite>None</cite> is <cite>signal</cite> is sample-based.</li>
+<li><strong>nblock_out</strong> &#8211; Desired output blocksize.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Convolution of <cite>signal</cite> with <cite>impulse_response</cite>.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Generator consisting of arrays.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Setting the input blocksize can be useful because this gives control over the delay of the process.
+Setting the output blocksize is convenient because you know on beforehand the output blocksize.
+Setting neither will result in blocksize of one, or individual samples. This will be slow.
+Setting both is not possible.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The <em>overlap-discard</em> method is more commonly known as <em>overlap-save</em>.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.diff">
+<code class="descclassname">streaming._iterator.</code><code class="descname">diff</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#streaming._iterator.diff" title="Permalink to this definition">¶</a></dt>
+<dd><p>Differentiate <cite>iterator</cite>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.interpolate_linear">
+<code class="descclassname">streaming._iterator.</code><code class="descname">interpolate_linear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#streaming._iterator.interpolate_linear" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interpolate <cite>y</cite> for <cite>x</cite> at new positions <cite>xnew</cite>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.filter_ba">
+<code class="descclassname">streaming._iterator.</code><code class="descname">filter_ba</code><span class="sig-paren">(</span><em>x</em>, <em>b</em>, <em>a</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#filter_ba"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.filter_ba" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply IIR filter to <cite>x</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> &#8211; Signal.</li>
+<li><strong>b</strong> &#8211; Numerator coefficients.</li>
+<li><strong>a</strong> &#8211; Denominator coefficients.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Filtered signal.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><a class="reference internal" href="#streaming._iterator.filter_sos" title="streaming._iterator.filter_sos"><code class="xref py py-func docutils literal"><span class="pre">filter_sos()</span></code></a> and <a class="reference external" href="http://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.lfilter.html#scipy.signal.lfilter" title="(in SciPy v0.18.1)"><code class="xref py py-func docutils literal"><span class="pre">scipy.signal.lfilter()</span></code></a></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.filter_ba_reference">
+<code class="descclassname">streaming._iterator.</code><code class="descname">filter_ba_reference</code><span class="sig-paren">(</span><em>x</em>, <em>b</em>, <em>a</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#filter_ba_reference"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.filter_ba_reference" title="Permalink to this definition">¶</a></dt>
+<dd><p>Filter signal <cite>x</cite> with linear time-invariant IIR filter that has numerator coefficients <cite>b</cite> and denominator coefficients <cite>a</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>b</strong> &#8211; Numerator coefficients.</li>
+<li><strong>a</strong> &#8211; Denominator coefficients. The first value is always a zero.</li>
+<li><strong>x</strong> &#8211; Signal.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Filtered signal.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>This function applies a linear time-invariant IIR filter using the difference equation</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.filter_sos">
+<code class="descclassname">streaming._iterator.</code><code class="descname">filter_sos</code><span class="sig-paren">(</span><em>x</em>, <em>sos</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#filter_sos"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.filter_sos" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply IIR filter to <cite>x</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> &#8211; Signal.</li>
+<li><strong>sos</strong> &#8211; Second-order sections.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Filtered signal.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><a class="reference internal" href="#streaming._iterator.filter_ba" title="streaming._iterator.filter_ba"><code class="xref py py-func docutils literal"><span class="pre">filter_ba()</span></code></a> and <a class="reference external" href="http://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.sosfilt.html#scipy.signal.sosfilt" title="(in SciPy v0.18.1)"><code class="xref py py-func docutils literal"><span class="pre">scipy.signal.sosfilt()</span></code></a></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming._iterator.vdl">
+<code class="descclassname">streaming._iterator.</code><code class="descname">vdl</code><span class="sig-paren">(</span><em>signal</em>, <em>times</em>, <em>delay</em>, <em>initial_value=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/_iterator.html#vdl"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming._iterator.vdl" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variable delay line which delays <cite>signal</cite> at &#8216;times&#8217; with &#8216;delay&#8217;.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>signal</strong> (<em>Iterator</em>) &#8211; Signal to be delayed.</li>
+<li><strong>delay</strong> (<em>Iterator</em>) &#8211; Delay.</li>
+<li><strong>initial_value</strong> &#8211; Sample to yield before first actual sample is yielded due to initial delay.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Times and delay should have the same unit, e.g. both in samples or both in seconds.</p>
+</div>
+</dd></dl>
+
+</div>
+
 
           </div>
         </div>
@@ -47,7 +274,7 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="signal.html" title="previous chapter">&lt;no title&gt;</a></li>
+      <li>Previous: <a href="signal.html" title="previous chapter">Signal Processing</a></li>
   </ul></li>
 </ul>
 </div>

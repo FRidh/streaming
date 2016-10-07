@@ -1,0 +1,596 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>streaming._iterator &#8212; streaming 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="streaming 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for streaming._iterator</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Iterator</span>
+<span class="sd">========</span>
+
+<span class="sd">The :mod:`streaming.iterator` module is a private module. Most algorithms for streams are implemented here using basic iterators.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">cytoolz</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">from</span> <span class="nn">._cython</span> <span class="k">import</span> <span class="n">_interpolate_linear</span> <span class="k">as</span> <span class="n">interpolate_linear</span>
+<span class="kn">from</span> <span class="nn">._cython</span> <span class="k">import</span> <span class="n">_filter_ba</span><span class="p">,</span> <span class="n">diff</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">fftconvolve</span> <span class="k">as</span> <span class="n">_convolve</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">_convolve</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">convolve</span>
+
+<div class="viewcode-block" id="blocks"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.blocks">[docs]</a><span class="k">def</span> <span class="nf">blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Partition iterable into blocks.</span>
+
+<span class="sd">    :param iterable: Iterable.</span>
+<span class="sd">    :param nblock: Samples per block.</span>
+<span class="sd">    :param noverlap: Amount of samples to overlap</span>
+<span class="sd">    :returns: Blocks.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># We use a different function for performance reasons</span>
+    <span class="k">if</span> <span class="n">noverlap</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nblock</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_overlapping_blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nblock</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Partition iterable into blocks.</span>
+
+<span class="sd">    :param iterable: Iterable.</span>
+<span class="sd">    :param nblock: Samples per block.</span>
+<span class="sd">    :returns: Blocks.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">iterator</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">iterable</span><span class="p">)</span>
+    <span class="n">partitions</span> <span class="o">=</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">nblock</span><span class="p">,</span> <span class="n">iterator</span><span class="p">)</span>
+    <span class="k">yield from</span> <span class="n">partitions</span>
+
+
+<span class="k">def</span> <span class="nf">_overlapping_blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Partition iterable into overlapping blocks of size `nblock`.</span>
+
+<span class="sd">    :param iterable: Iterable.</span>
+<span class="sd">    :param nblock: Samples per block.</span>
+<span class="sd">    :param noverlap: Amount of samples to overlap.</span>
+<span class="sd">    :returns: Blocks.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">iterator</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">iterable</span><span class="p">)</span>
+    <span class="n">nadvance</span> <span class="o">=</span> <span class="n">nblock</span> <span class="o">-</span> <span class="n">noverlap</span>
+
+    <span class="k">if</span> <span class="n">nadvance</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;`noverlap` has to be smaller than `nblock-1`.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># First `noverlap` samples</span>
+    <span class="n">previous</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">cytoolz</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">noverlap</span><span class="p">,</span> <span class="n">iterator</span><span class="p">))</span>
+    <span class="n">advances</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">nadvance</span><span class="p">,</span> <span class="n">iterator</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">advance</span> <span class="ow">in</span> <span class="n">advances</span><span class="p">:</span>
+        <span class="n">block</span> <span class="o">=</span> <span class="n">previous</span> <span class="o">+</span> <span class="n">advance</span> <span class="c1"># Concat lists</span>
+        <span class="k">yield</span> <span class="n">block</span>
+        <span class="n">previous</span> <span class="o">=</span> <span class="n">block</span><span class="p">[</span><span class="o">-</span><span class="n">noverlap</span><span class="p">:]</span>
+
+
+<span class="k">def</span> <span class="nf">change_blocks</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">,</span> <span class="n">nblock_new</span><span class="p">,</span> <span class="n">noverlap_new</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Change blocksize and/or overlap of iterator.</span>
+
+<span class="sd">    :param iterator: Iterator.</span>
+<span class="sd">    :param nblock: Current blocksize.</span>
+<span class="sd">    :param noverlap: Current overlap.</span>
+<span class="sd">    :param nblock_new: New blocksize.</span>
+<span class="sd">    :param noverlap_new: New overlap.</span>
+<span class="sd">    :returns: Iterator with new blocksize and/or overlap.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Same block size, same overlap</span>
+    <span class="k">if</span> <span class="n">nblock_new</span><span class="o">==</span><span class="n">nblock</span> <span class="ow">and</span> <span class="n">noverlap_new</span><span class="o">==</span><span class="n">noverlap</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">iterator</span>
+
+    <span class="c1"># New block size is multiple of old block size, same overlap</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">nblock_new</span> <span class="o">%</span> <span class="n">nblock</span> <span class="ow">and</span> <span class="n">noverlap_new</span><span class="o">==</span><span class="n">noverlap</span><span class="p">:</span>
+        <span class="c1"># factor is multiple of current blocksize</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="n">nblock_new</span> <span class="o">//</span> <span class="n">nblock</span>
+        <span class="c1"># therefore we concat `factor` blocks into a new block</span>
+        <span class="n">partitioned</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">,</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">factor</span><span class="p">,</span> <span class="n">iterator</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">partitioned</span>
+
+    <span class="c1"># Old block size is multiple of new block size, sample overlap</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">nblock</span> <span class="o">%</span> <span class="n">nblock_new</span> <span class="ow">and</span> <span class="n">noverlap_new</span><span class="o">==</span><span class="n">noverlap</span><span class="p">:</span>
+        <span class="c1"># Partition each block in blocks with size nblock_new</span>
+        <span class="n">partition</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">nblock_new</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="c1"># And chain the iterables</span>
+        <span class="n">partitioned</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">iterator</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">partitioned</span>
+
+    <span class="c1"># Convert to samples and create blocks</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">blocks</span><span class="p">(</span><span class="n">samples</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">),</span> <span class="n">nblock_new</span><span class="p">,</span> <span class="n">noverlap_new</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">samples</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convert iterator with (overlapped) blocks to iterator with individual samples.</span>
+
+<span class="sd">    :param iterator: Iterator.</span>
+<span class="sd">    :param nblock: Samples per block</span>
+<span class="sd">    :param noverlap: Amount of samples to overlap</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">noverlap</span><span class="o">!=</span><span class="mi">0</span><span class="p">:</span>
+        <span class="n">nadvance</span> <span class="o">=</span> <span class="n">nblock</span> <span class="o">-</span> <span class="n">noverlap</span>
+        <span class="n">iterator</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">nadvance</span><span class="p">],</span> <span class="n">iterator</span><span class="p">)</span>
+    <span class="k">yield from</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">iterator</span><span class="p">)</span>
+
+
+<span class="c1"># Some convenience functions</span>
+
+<span class="k">def</span> <span class="nf">sliding_mean</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sliding mean.</span>
+
+<span class="sd">    :param iterable: Iterable.</span>
+<span class="sd">    :param nwindow: Window size in samples.</span>
+<span class="sd">    :param noverlap: Amount of samples to overlap.</span>
+<span class="sd">    :returns: Iterable of means.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield from</span> <span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">,</span> <span class="n">blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">sliding_std</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sliding standard deviation.</span>
+
+<span class="sd">    :param iterable: Iterable.</span>
+<span class="sd">    :param nwindow: Window size in samples.</span>
+<span class="sd">    :param noverlap: Amount of samples to overlap.</span>
+<span class="sd">    :returns: Iterable of standard deviations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield from</span> <span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">,</span> <span class="n">blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">sliding_var</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sliding variance.</span>
+
+<span class="sd">    :param iterable: Iterable.</span>
+<span class="sd">    :param nwindow: Window size in samples.</span>
+<span class="sd">    :param noverlap: Amount of samples to overlap.</span>
+<span class="sd">    :returns: Iterable of standard deviations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield from</span> <span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">var</span><span class="p">,</span> <span class="n">blocks</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">))</span>
+
+
+<span class="c1"># Convolution</span>
+
+<div class="viewcode-block" id="convolve"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.convolve">[docs]</a><span class="k">def</span> <span class="nf">convolve</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">ntaps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">initial_values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve signal with impulse response.</span>
+
+<span class="sd">    :param signal: Signal, not in blocks.</span>
+<span class="sd">    :param impulse_responses: Impulse responses of length `ntaps`.</span>
+<span class="sd">    :param nblock: Blocksize to use for the convolution.</span>
+<span class="sd">    :param ntaps: Length of impulse responses.</span>
+<span class="sd">    :param initial_values. Value to use before convolution kicks in.</span>
+
+<span class="sd">    .. note:: This function takes samples and yields samples. It wraps :func:`convolve_overlap_add` and therefore requires a blocksize for computing the convolution.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">signal</span> <span class="o">=</span> <span class="n">blocks</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">nblock</span><span class="p">)</span>
+    <span class="n">convolved</span> <span class="o">=</span> <span class="n">convolve_overlap_add</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">,</span> <span class="n">nblock</span><span class="o">=</span><span class="n">nblock</span><span class="p">,</span> <span class="n">ntaps</span><span class="o">=</span><span class="n">ntaps</span><span class="p">,</span> <span class="n">initial_values</span><span class="o">=</span><span class="n">initial_values</span><span class="p">)</span>
+    <span class="k">yield from</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">convolved</span><span class="p">)</span></div>
+
+<span class="k">def</span> <span class="nf">_convolve_crossfade</span><span class="p">(</span><span class="n">block</span><span class="p">,</span> <span class="n">ir1</span><span class="p">,</span> <span class="n">ir2</span><span class="p">,</span> <span class="n">fading1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve block with two impulse responses and crossfade the result.</span>
+
+<span class="sd">    :param block: Block.</span>
+<span class="sd">    :param ir1: Impulse response 1.</span>
+<span class="sd">    :param ir2: Impulse response 2.</span>
+<span class="sd">    :param fading1: Fading.</span>
+<span class="sd">    :returns: Crossfaded convolutions of block and impulse responses.</span>
+
+<span class="sd">    We switch from `ir1` to `ir2`.</span>
+
+<span class="sd">    A more efficient method is presented in *Efficient time-varying FIR filtering using</span>
+<span class="sd">    crossfading implemented in the DFT domain* by Frank Wefers.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Convolve segment with both impulse responses.</span>
+    <span class="n">convolved1</span> <span class="o">=</span> <span class="n">_convolve</span><span class="p">(</span><span class="n">block</span><span class="p">,</span> <span class="n">ir1</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">)</span>
+    <span class="n">convolved2</span> <span class="o">=</span> <span class="n">_convolve</span><span class="p">(</span><span class="n">block</span><span class="p">,</span> <span class="n">ir2</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">)</span>
+    <span class="c1"># Fading windows</span>
+    <span class="n">fading2</span> <span class="o">=</span> <span class="mf">1.</span> <span class="o">-</span> <span class="n">fading1</span>
+    <span class="c1"># Crossfaded convolutions</span>
+    <span class="n">convolved</span> <span class="o">=</span> <span class="n">convolved1</span> <span class="o">*</span> <span class="n">fading1</span> <span class="o">+</span> <span class="n">convolved2</span> <span class="o">*</span> <span class="n">fading2</span>
+    <span class="k">return</span> <span class="n">convolved</span>
+
+
+<span class="k">def</span> <span class="nf">convolve_overlap_add_spectra</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">spectra</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">nbins</span><span class="p">,</span> <span class="n">initial_values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve iterable `signal` with impulse responses of `spectra.</span>
+
+
+<span class="sd">    This function directly uses the spectra to compute the acyclic convolution.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">NotImplemented</span>
+
+<div class="viewcode-block" id="convolve_overlap_add"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.convolve_overlap_add">[docs]</a><span class="k">def</span> <span class="nf">convolve_overlap_add</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">,</span> <span class="n">nhop</span><span class="p">,</span> <span class="n">ntaps</span><span class="p">,</span> <span class="n">initial_values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve iterable `signal` with time-variant `impulse_responses`.</span>
+
+<span class="sd">    :param signal: Signal in blocks of size `nblock`.</span>
+<span class="sd">    :param impulse_responses: Impulse responses of length `ntaps`.</span>
+<span class="sd">    :param nhop: Impulse responses is updated every `nhop` samples. This should correspond to the blocksize of `signal`.</span>
+<span class="sd">    :param ntaps: Length of impulse responses.</span>
+<span class="sd">    :param initial_values. Value to use before convolution kicks in.</span>
+<span class="sd">    :returns: Convolution.</span>
+
+<span class="sd">    This function implements the overlap-add method. Time-variant `impulse_responses is supported.</span>
+<span class="sd">    Each item (`block`) in `signal` corresponds to an impulse response (`ir`) in `impulse_responses`.</span>
+
+<span class="sd">    This implementation of overlap-add buffers only one segment. Therefore, only `nblock&gt;=ntaps` is supported.</span>
+
+<span class="sd">    .. warning:: This function cannot be used when `ntaps &gt; nblock`.</span>
+
+<span class="sd">    .. seealso:: :func:`convolve_overlap_save`</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">nblock</span> <span class="o">=</span> <span class="n">nhop</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">nblock</span> <span class="o">&gt;=</span> <span class="n">ntaps</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Amount of samples in block should be the same or more than the amount of filter taps.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">initial_values</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tail_previous_block</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ntaps</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">tail_previous_block</span> <span class="o">=</span> <span class="n">initial_values</span>
+
+    <span class="k">for</span> <span class="n">block</span><span class="p">,</span> <span class="n">ir</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">):</span>
+        <span class="c1"># The result of the convolution consists of a head, a body and a tail</span>
+        <span class="c1"># - the head and tail have length `taps-1`</span>
+        <span class="c1"># - the body has length `signal-taps+1`??</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">convolved</span> <span class="o">=</span> <span class="n">_convolve</span><span class="p">(</span><span class="n">block</span><span class="p">,</span> <span class="n">ir</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;full&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">GeneratorExit</span>
+
+        <span class="c1"># The final block consists of</span>
+        <span class="c1"># - the head and body of the current convolution</span>
+        <span class="c1"># - and the tail of the previous convolution.</span>
+        <span class="n">resulting_block</span> <span class="o">=</span> <span class="n">convolved</span><span class="p">[:</span><span class="o">-</span><span class="n">ntaps</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1">#print(resulting_block)</span>
+        <span class="c1">#resulting_block[:ntaps-1] += tail_previous_block</span>
+        <span class="n">resulting_block</span><span class="p">[:</span><span class="n">ntaps</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">resulting_block</span><span class="p">[:</span><span class="n">ntaps</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">tail_previous_block</span> <span class="c1"># Because of possibly different dtypes</span>
+        <span class="c1"># We store the tail for the  next cycle</span>
+        <span class="n">tail_previous_block</span> <span class="o">=</span> <span class="n">convolved</span><span class="p">[</span><span class="o">-</span><span class="n">ntaps</span><span class="o">+</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="c1">#print(tail_previous_block)</span>
+
+        <span class="c1"># Yield the result of this step</span>
+        <span class="k">yield</span> <span class="n">resulting_block</span></div>
+
+
+<div class="viewcode-block" id="convolve_overlap_discard"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.convolve_overlap_discard">[docs]</a><span class="k">def</span> <span class="nf">convolve_overlap_discard</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_response</span><span class="p">,</span> <span class="n">nblock_in</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nblock_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.</span>
+
+<span class="sd">    :param signal: Signal. Can either consists of blocks or samples. `nblock_in` should be set to the block size of the signal.</span>
+<span class="sd">    :param impulse_response: Linear time-invariant impulse response of filter.</span>
+<span class="sd">    :param nblock_in: Actual input blocksize of signal. Should be set to `None` is `signal` is sample-based.</span>
+<span class="sd">    :param nblock_out: Desired output blocksize.</span>
+<span class="sd">    :returns: Convolution of `signal` with `impulse_response`.</span>
+<span class="sd">    :rtype: Generator consisting of arrays.</span>
+
+<span class="sd">    Setting the input blocksize can be useful because this gives control over the delay of the process.</span>
+<span class="sd">    Setting the output blocksize is convenient because you know on beforehand the output blocksize.</span>
+<span class="sd">    Setting neither will result in blocksize of one, or individual samples. This will be slow.</span>
+<span class="sd">    Setting both is not possible.</span>
+
+
+<span class="sd">    .. note:: The *overlap-discard* method is more commonly known as *overlap-save*.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Amount of filter taps</span>
+    <span class="n">ntaps</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">impulse_response</span><span class="p">)</span>
+    <span class="c1"># Amount of overlap that is needed</span>
+    <span class="n">noverlap</span> <span class="o">=</span> <span class="n">ntaps</span> <span class="o">-</span><span class="mi">1</span>
+
+    <span class="c1"># In the following block we create overlapping windows.</span>
+
+    <span class="c1"># Both are set.</span>
+    <span class="k">if</span> <span class="n">nblock_in</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">nblock_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Set block size of either input or output.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Only output blocksize is explicitly mentioned</span>
+    <span class="k">elif</span> <span class="n">nblock_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">nblock_in</span> <span class="o">=</span> <span class="n">nblock_out</span> <span class="o">+</span> <span class="n">ntaps</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="c1"># Only input blocksize is explicitly mentioned</span>
+    <span class="k">elif</span> <span class="n">nblock_in</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">nblock_in</span> <span class="o">&gt;=</span> <span class="n">ntaps</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Amount of samples in block should be the same or more than the amount of filter taps.&quot;</span><span class="p">)</span>
+        <span class="n">nblock_out</span> <span class="o">=</span> <span class="n">nblock_in</span> <span class="o">-</span> <span class="n">ntaps</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">nblock_in</span> <span class="o">=</span> <span class="n">ntaps</span>
+        <span class="n">nblock_out</span> <span class="o">=</span> <span class="n">nblock_in</span> <span class="o">-</span> <span class="n">ntaps</span> <span class="o">+</span> <span class="mi">1</span>
+
+    <span class="n">windows</span> <span class="o">=</span> <span class="n">blocks</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">nblock_in</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">)</span>
+
+    <span class="c1">## We have sample-based signal and we want blocks with specified size out.</span>
+    <span class="c1">#if nblock_in is None and nblock_out is not None:</span>
+        <span class="c1">#nblock_in = nblock_out + ntaps -1</span>
+        <span class="c1">#windows = blocks(signal, nblock_in, noverlap)</span>
+    <span class="c1">## We have sample-based signal and we want samples out (actually blocks of size 1).</span>
+    <span class="c1">#elif nblock_in is None and nblock_out is None:</span>
+        <span class="c1">#nblock_in = ntaps</span>
+        <span class="c1">#windows = blocks(signal, nblock_in, noverlap)</span>
+    <span class="c1">## We have block-based signal and we don&#39;t mind output block size</span>
+    <span class="c1">#elif nblock_in is not None and nblock_out is None:</span>
+        <span class="c1">#if not nblock_in &gt;= ntaps:</span>
+            <span class="c1">#raise ValueError(&quot;Amount of samples in block should be the same or more than the amount of filter taps.&quot;)</span>
+        <span class="c1">#nblock_out = nblock_in - ntaps + 1</span>
+        <span class="c1">#windows = change_blocks(signal, nblock_in, 0, nblock_in, noverlap)</span>
+    <span class="c1">## We have block-based signal and we have specified an output block. We need to change the block size.</span>
+    <span class="c1">#elif nblock_in is not None and nblock_out is not None:</span>
+        <span class="c1">#if not nblock_in &gt;= ntaps:</span>
+            <span class="c1">#raise ValueError(&quot;Amount of samples in block should be the same or more than the amount of filter taps.&quot;)</span>
+        <span class="c1">#nblock_in_new = nblock_out + ntaps -1</span>
+        <span class="c1">#windows = change_blocks(signal, nblock_in, 0, nblock_in_new, noverlap, )</span>
+        <span class="c1">#nblock_in = nblock_in_new</span>
+
+    <span class="c1"># Convolve function to use</span>
+    <span class="n">_convolve_func</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_convolve</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">impulse_response</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;valid&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Convolved blocks</span>
+    <span class="n">convolved</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">_convolve_func</span><span class="p">,</span> <span class="n">windows</span> <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">convolved</span><span class="p">,</span> <span class="n">nblock_out</span></div>
+
+
+<span class="k">def</span> <span class="nf">convolve_overlap_save</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">,</span> <span class="n">nhop</span><span class="p">,</span> <span class="n">ntaps</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.</span>
+
+<span class="sd">    :param signal: Signal. Consists of samples.</span>
+<span class="sd">    :param impulse_responses: Linear time-variant impulses response of filter.</span>
+<span class="sd">    :param nhop: Impulse response is renewed every `nhop` samples.</span>
+<span class="sd">    :returns: Convolution of `signal` with `impulse_responses`.</span>
+<span class="sd">    :rtype: Generator consisting of arrays.</span>
+
+<span class="sd">    .. note:: The *overlap-discard* method is more commonly known as *overlap-save*.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">nwindow</span> <span class="o">=</span> <span class="n">nhop</span> <span class="o">+</span> <span class="n">ntaps</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">noverlap</span> <span class="o">=</span> <span class="n">ntaps</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">windows</span> <span class="o">=</span> <span class="n">blocks</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">)</span>
+    <span class="c1"># Convolve function to use</span>
+    <span class="n">_convolve_func</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">_convolve</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;valid&#39;</span><span class="p">)</span>
+    <span class="c1"># Convolved blocks</span>
+    <span class="n">convolved</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">_convolve_func</span><span class="p">,</span> <span class="n">windows</span><span class="p">,</span> <span class="n">impulse_responses</span> <span class="p">)</span>
+    <span class="k">yield from</span> <span class="n">convolved</span>
+
+
+<span class="k">def</span> <span class="nf">cumsum</span><span class="p">(</span><span class="n">iterator</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Cumulative sum.</span>
+
+<span class="sd">    .. seealso:: :func:`itertools.accumulate` and :func:`np.cumsum`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield from</span> <span class="n">itertools</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">operator</span><span class="o">.</span><span class="n">add</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">cummul</span><span class="p">(</span><span class="n">iterator</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Cumulative p.</span>
+
+<span class="sd">    .. seealso:: :func:`itertools.accumulate` and :func:`np.cumsum`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield from</span> <span class="n">itertools</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">operator</span><span class="o">.</span><span class="n">mul</span><span class="p">)</span>
+
+
+<span class="c1">#def diff(iterator, initial_value=0.0):</span>
+    <span class="c1">#&quot;&quot;&quot;Differentiate `iterator`.</span>
+    <span class="c1">#&quot;&quot;&quot;</span>
+    <span class="c1">#current = next(iterator)</span>
+    <span class="c1">#while True:</span>
+        <span class="c1">#old = current</span>
+        <span class="c1">#current = next(iterator)</span>
+        <span class="c1">#yield current-old</span>
+
+<span class="c1">#def integrate(iterator, initial_value=0.0):</span>
+    <span class="c1">#total = 0.0</span>
+    <span class="c1">#while True:</span>
+        <span class="c1">#total += next(iterator)</span>
+        <span class="c1">#yield total</span>
+
+<div class="viewcode-block" id="vdl"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.vdl">[docs]</a><span class="k">def</span> <span class="nf">vdl</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="n">delay</span><span class="p">,</span> <span class="n">initial_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Variable delay line which delays `signal` at &#39;times&#39; with &#39;delay&#39;.</span>
+
+<span class="sd">    :param signal: Signal to be delayed.</span>
+<span class="sd">    :type signal: Iterator</span>
+<span class="sd">    :param delay: Delay.</span>
+<span class="sd">    :type delay: Iterator</span>
+<span class="sd">    :param initial_value: Sample to yield before first actual sample is yielded due to initial delay.</span>
+
+<span class="sd">    .. note:: Times and delay should have the same unit, e.g. both in samples or both in seconds.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dt0</span><span class="p">,</span> <span class="n">delay</span> <span class="o">=</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">peek</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+    <span class="n">times</span><span class="p">,</span> <span class="n">_times</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">tee</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+
+    <span class="c1"># Yield initial value before interpolation kicks in</span>
+    <span class="c1"># Note that this method, using tee, buffers all samples that will be discarded.</span>
+    <span class="c1"># Therefore, room for optimization!</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">initial_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">while</span> <span class="nb">next</span><span class="p">(</span><span class="n">_times</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">dt0</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">yield</span> <span class="n">initial_value</span>
+
+    <span class="n">times1</span><span class="p">,</span> <span class="n">times2</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">tee</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">interpolated</span> <span class="o">=</span> <span class="n">interpolate_linear</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">add</span><span class="p">,</span> <span class="n">times2</span><span class="p">,</span> <span class="n">delay</span><span class="p">),</span> <span class="n">signal</span><span class="p">,</span> <span class="n">times1</span><span class="p">)</span>
+    <span class="k">yield from</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">interpolated</span><span class="p">)</span> <span class="c1"># FIXME: move drop before interpolation, saves memory</span></div>
+
+
+<span class="c1"># Reference implementation</span>
+
+<div class="viewcode-block" id="filter_ba_reference"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.filter_ba_reference">[docs]</a><span class="k">def</span> <span class="nf">filter_ba_reference</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Filter signal `x` with linear time-invariant IIR filter that has numerator coefficients `b` and denominator coefficients `a`.</span>
+
+<span class="sd">    :param b: Numerator coefficients.</span>
+<span class="sd">    :param a: Denominator coefficients. The first value is always a zero.</span>
+<span class="sd">    :param x: Signal.</span>
+<span class="sd">    :returns: Filtered signal.</span>
+
+<span class="sd">    This function applies a linear time-invariant IIR filter using the difference equation</span>
+
+<span class="sd">    .. math:: y[n] = -\sum_k=1^M a_k y[n-k] + \sum_k=0^(N-1) b_k x[n-k]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="n">na</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">nb</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+
+    <span class="c1"># Buffers</span>
+    <span class="n">xd</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">deque</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">nb</span><span class="p">,</span> <span class="n">nb</span><span class="p">)</span>
+    <span class="n">yd</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">deque</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">na</span><span class="p">,</span> <span class="n">na</span><span class="p">)</span>
+
+    <span class="c1"># Invert filter coefficients order</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">a</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="c1"># Update inputs buffer with new signal value</span>
+        <span class="n">xd</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="c1"># Calculate output from difference equation</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="o">-</span><span class="nb">sum</span><span class="p">(</span><span class="n">a</span><span class="o">*</span><span class="n">yd</span><span class="p">)</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span><span class="n">b</span><span class="o">*</span><span class="n">xd</span><span class="p">)</span>
+        <span class="c1"># Update outputs buffer with new output value</span>
+        <span class="n">yd</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+        <span class="c1"># Yield current output value</span>
+        <span class="k">yield</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="filter_ba"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.filter_ba">[docs]</a><span class="k">def</span> <span class="nf">filter_ba</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Apply IIR filter to `x`.</span>
+
+<span class="sd">    :param x: Signal.</span>
+<span class="sd">    :param b: Numerator coefficients.</span>
+<span class="sd">    :param a: Denominator coefficients.</span>
+<span class="sd">    :returns: Filtered signal.</span>
+
+<span class="sd">    .. seealso:: :func:`filter_sos` and :func:`scipy.signal.lfilter`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="c1"># Drop the first value that is a one. See difference equation.</span>
+
+    <span class="c1"># Drop trailing zeros. They&#39;re not contributing and introduce a bug as well (leading zero in result).</span>
+    <span class="k">while</span> <span class="n">a</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">a</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">while</span> <span class="n">b</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+
+    <span class="n">na</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="n">nb</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+
+    <span class="c1"># Buffers</span>
+    <span class="n">xd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">nb</span><span class="p">)</span>
+    <span class="n">yd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">na</span><span class="p">)</span>
+
+    <span class="k">yield from</span> <span class="n">_filter_ba</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">xd</span><span class="p">,</span> <span class="n">yd</span><span class="p">,</span> <span class="n">nb</span><span class="p">,</span> <span class="n">na</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="filter_sos"><a class="viewcode-back" href="../../_iterator.html#streaming._iterator.filter_sos">[docs]</a><span class="k">def</span> <span class="nf">filter_sos</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">sos</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Apply IIR filter to `x`.</span>
+
+<span class="sd">    :param x: Signal.</span>
+<span class="sd">    :param sos: Second-order sections.</span>
+<span class="sd">    :returns: Filtered signal.</span>
+
+<span class="sd">    .. seealso:: :func:`filter_ba` and :func:`scipy.signal.sosfilt`</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_2d</span><span class="p">(</span><span class="n">sos</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sos</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;sos array must be 2D&#39;</span><span class="p">)</span>
+
+    <span class="n">n_sections</span><span class="p">,</span> <span class="n">m</span> <span class="o">=</span> <span class="n">sos</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">if</span> <span class="n">m</span> <span class="o">!=</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;sos array must be shape (n_sections, 6)&#39;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">sos</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">filter_ba</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">section</span><span class="p">[:</span><span class="mi">3</span><span class="p">],</span> <span class="n">section</span><span class="p">[</span><span class="mi">3</span><span class="p">:])</span>
+    <span class="k">yield from</span> <span class="n">x</span></div>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;blocks&#39;</span><span class="p">,</span> <span class="s1">&#39;convolve_overlap_add&#39;</span><span class="p">,</span> <span class="s1">&#39;convolve&#39;</span><span class="p">,</span> <span class="s1">&#39;convolve_overlap_discard&#39;</span><span class="p">,</span> <span class="s1">&#39;diff&#39;</span><span class="p">,</span> <span class="s1">&#39;interpolate_linear&#39;</span><span class="p">,</span> <span class="s1">&#39;filter_ba&#39;</span><span class="p">,</span> <span class="s1">&#39;filter_ba_reference&#39;</span><span class="p">,</span> <span class="s1">&#39;filter_sos&#39;</span><span class="p">,</span> <span class="s1">&#39;vdl&#39;</span><span class="p">]</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;1970, Frederik Rietdijk.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.7</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

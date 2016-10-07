@@ -1,0 +1,352 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>streaming.stream &#8212; streaming 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="streaming 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for streaming.stream</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Stream</span>
+<span class="sd">======</span>
+
+<span class="sd">The Stream module contains the classes :class:`Stream` and :class:`BlockStream`.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+<span class="kn">import</span> <span class="nn">cytoolz</span>
+
+<span class="kn">from</span> <span class="nn">multipledispatch.conflict</span> <span class="k">import</span> <span class="n">AmbiguityWarning</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">AmbiguityWarning</span><span class="p">)</span>
+
+<span class="c1">#import streaming</span>
+<span class="kn">from</span> <span class="nn">streaming.operators</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">streaming.abstractstream</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">streaming.itertools</span> <span class="k">import</span> <span class="o">*</span>
+
+<div class="viewcode-block" id="Stream"><a class="viewcode-back" href="../../stream.html#streaming.stream.Stream">[docs]</a><span class="k">class</span> <span class="nc">Stream</span><span class="p">(</span><span class="n">AbstractStream</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Stream of samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterator</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">iterator</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">nblock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;Stream does not have a blocksize&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">blocks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">blocks</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">BlockStream</span><span class="p">(</span><span class="n">blocks</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Stream.drop"><a class="viewcode-back" href="../../stream.html#streaming.stream.Stream.drop">[docs]</a>    <span class="k">def</span> <span class="nf">drop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nsamples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Drop the first `n` samples.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">nsamples</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Stream.take"><a class="viewcode-back" href="../../stream.html#streaming.stream.Stream.take">[docs]</a>    <span class="k">def</span> <span class="nf">take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nsamples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Take the first `nsamples` samples.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">nsamples</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">samples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="BlockStream"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream">[docs]</a><span class="k">class</span> <span class="nc">BlockStream</span><span class="p">(</span><span class="n">AbstractStream</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Stream of blocks of samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterator</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+
+        <span class="c1"># We either peek, and we know the type and blocksize assuming a homogeneous stream</span>
+        <span class="c1"># or we don&#39;t and we need nblock as argument and hope the blocks are of the right type.</span>
+        <span class="c1">#try:</span>
+        <span class="c1">#first, iterator = peek(iterator)</span>
+        <span class="c1">#except StopIteration:</span>
+                <span class="c1">#raise ValueError(&quot;Empty iterator.&quot;)</span>
+        <span class="c1">## The elements in the iterator have to be iterators.</span>
+        <span class="c1">## Because the idea of the blockstream is to use vectorized operations</span>
+        <span class="c1">## we require a stricter class, np.ndarray</span>
+        <span class="c1">#if not isinstance(first, np.ndarray):</span>
+            <span class="c1">#raise ValueError(&quot;Items in iterator have to be of class `np.ndarray`.&quot;)</span>
+
+        <span class="c1"># With the above disabled we get failing tests for eq and ne operations</span>
+        <span class="c1"># See https://github.com/numpy/numpy/issues/5016</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="n">iterator</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">noverlap</span> <span class="o">&gt;</span> <span class="n">nblock</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;`noverlap` should be smaller than `nblock-1`&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nblock</span> <span class="o">=</span> <span class="n">nblock</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_noverlap</span> <span class="o">=</span> <span class="n">noverlap</span>
+
+    <span class="k">def</span> <span class="nf">_construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterator</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">BlockStream</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nblock</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">noverlap</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">nblock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nblock</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">noverlap</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_noverlap</span>
+
+    <span class="k">def</span> <span class="nf">blocks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+
+        <span class="n">blocks</span> <span class="o">=</span> <span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">change_blocks</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nblock</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">noverlap</span><span class="p">,</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">BlockStream</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">blocks</span><span class="p">),</span> <span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="p">)</span>
+
+<div class="viewcode-block" id="BlockStream.drop"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.drop">[docs]</a>    <span class="k">def</span> <span class="nf">drop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Drop the first `n` blocks.</span>
+
+<span class="sd">        .. note:: If you want to drop `n` samples, use `s.samples().drop(n)`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="n">cytoolz</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.map"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.map">[docs]</a>    <span class="k">def</span> <span class="nf">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Map `func` to each block in :class:`BlockStream`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="bp">self</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.mean"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.mean">[docs]</a>    <span class="k">def</span> <span class="nf">mean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Mean value calculated over `nblock` samples.</span>
+
+<span class="sd">        This function returns a :class:`Stream`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.nblocks"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.nblocks">[docs]</a>    <span class="k">def</span> <span class="nf">nblocks</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Amount of blocks in stream.</span>
+
+<span class="sd">        .. warning:: This consumes the stream.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="BlockStream.std"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.std">[docs]</a>    <span class="k">def</span> <span class="nf">std</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Standard deviation calculated over `nblock` samples.</span>
+
+<span class="sd">        This function returns a :class:`Stream`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.sum"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.sum">[docs]</a>    <span class="k">def</span> <span class="nf">sum</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Sum calculated over `nblock` samples.</span>
+
+<span class="sd">        This function returns a :class:`Stream`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.take"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.take">[docs]</a>    <span class="k">def</span> <span class="nf">take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nblocks</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Take `nblocks` from stream.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="n">cytoolz</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">nblocks</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.samples"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.samples">[docs]</a>    <span class="k">def</span> <span class="nf">samples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over samples.</span>
+
+<span class="sd">        :returns: Stream of samples insteads of blocks. Possible overlap is taking into account.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">samples</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nblock</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">noverlap</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BlockStream.var"><a class="viewcode-back" href="../../stream.html#streaming.stream.BlockStream.var">[docs]</a>    <span class="k">def</span> <span class="nf">var</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Variance calculated over `nblock` samples.</span>
+
+<span class="sd">        This function returns a :class:`Stream`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">var</span><span class="p">))</span></div></div>
+
+
+<span class="c1"># Binary operators (AbstractStream, Stream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_abstractstream_stream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">_binary_op_abstractstream_abstractstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (AbstractStream, BlockStream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_abstractstream_blockstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">_binary_op_abstractstream_stream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">.</span><span class="n">samples</span><span class="p">())</span>
+
+<span class="c1"># Binary operators (Stream, Stream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_stream_stream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">b</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span>
+
+<span class="c1"># Binary operators (BlockStream, BlockStream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_blockstream_blockstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">nblock</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">nblock</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">BlockStream</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">nblock</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">nblock</span><span class="p">)</span>
+    <span class="c1">#elif a.nblock % b.nblock == 0:</span>
+        <span class="c1">## A is multiple of B</span>
+        <span class="c1">#pass</span>
+    <span class="c1">#elif b.nblock % a.nblock == 0:</span>
+        <span class="c1">## B is multiple of A</span>
+        <span class="c1">#pass</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">samples</span><span class="p">(),</span> <span class="n">b</span><span class="o">.</span><span class="n">samples</span><span class="p">())</span>
+
+<span class="c1"># Binary operators (Stream, object)</span>
+<span class="k">def</span> <span class="nf">_binary_op_stream_object</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">a</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (object, Stream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_object_stream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">b</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (BlockStream, object)</span>
+<span class="k">def</span> <span class="nf">_binary_op_blockstream_object</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">BlockStream</span><span class="p">((</span><span class="n">op</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">a</span><span class="o">.</span><span class="n">_iterator</span><span class="p">),</span> <span class="n">a</span><span class="o">.</span><span class="n">nblock</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (object, BlockStream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_object_blockstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">BlockStream</span><span class="p">((</span><span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">b</span><span class="o">.</span><span class="n">_iterator</span><span class="p">),</span> <span class="n">b</span><span class="o">.</span><span class="n">nblock</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (Stream, BlockStream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_stream_blockstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">.</span><span class="n">samples</span><span class="p">())</span>
+    <span class="c1">#return Stream(map(op, a._iterator, b._iterator))</span>
+
+<span class="c1"># Binary operators (BlockStream, Stream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_blockstream_stream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">samples</span><span class="p">(),</span> <span class="n">b</span><span class="p">)</span>
+    <span class="c1">#return BlockStream(map(op, a._iterator, b._iterator), a.nblock)</span>
+
+<span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="o">.</span><span class="n">_BINARY_OPERATORS</span><span class="p">:</span>
+    <span class="c1"># Get the dispatcher for this operation</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+    <span class="c1"># And add the specific implementations</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">Stream</span><span class="p">,</span> <span class="n">Stream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_stream_stream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">BlockStream</span><span class="p">,</span> <span class="n">BlockStream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_blockstream_blockstream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">AbstractStream</span><span class="p">,</span> <span class="n">Stream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_abstractstream_stream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">AbstractStream</span><span class="p">,</span> <span class="n">BlockStream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_abstractstream_blockstream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">Stream</span><span class="p">,</span> <span class="nb">object</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_stream_object</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="nb">object</span><span class="p">,</span> <span class="n">Stream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_object_stream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">BlockStream</span><span class="p">,</span> <span class="nb">object</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_blockstream_object</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="nb">object</span><span class="p">,</span> <span class="n">BlockStream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_object_blockstream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">Stream</span><span class="p">,</span> <span class="n">BlockStream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_stream_blockstream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">BlockStream</span><span class="p">,</span> <span class="n">Stream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_blockstream_stream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+
+<span class="c1"># Itertools</span>
+
+<span class="nd">@tee</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Stream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Stream</span><span class="p">(</span><span class="n">it</span><span class="p">)</span> <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">tee</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+<span class="nd">@cycle</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Stream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">cycle</span><span class="p">(</span><span class="n">iterable</span><span class="p">))</span>
+
+<span class="nd">@toarray</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Stream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">iterable</span><span class="p">))</span>
+
+<span class="nd">@tee</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">BlockStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">BlockStream</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="n">iterable</span><span class="o">.</span><span class="n">nblock</span><span class="p">)</span> <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">tee</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+<span class="nd">@cycle</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">BlockStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">BlockStream</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">cycle</span><span class="p">(</span><span class="n">iterable</span><span class="p">),</span> <span class="n">nblock</span><span class="o">=</span><span class="n">iterable</span><span class="o">.</span><span class="n">nblock</span><span class="p">)</span>
+
+<span class="nd">@toarray</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">BlockStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">iterable</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+
+<span class="c1"># Other helpful functions</span>
+
+<div class="viewcode-block" id="count"><a class="viewcode-back" href="../../stream.html#streaming.stream.count">[docs]</a><span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Count.</span>
+
+<span class="sd">    .. seealso:: :func:`itertools.count`</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">))</span></div>
+
+<span class="nd">@repeat_each</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Stream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">repeat_each</span><span class="p">(</span><span class="n">iterable</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+<span class="nd">@repeat_each</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">BlockStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">repeat_each</span><span class="p">(</span><span class="n">iterable</span><span class="o">.</span><span class="n">samples</span><span class="p">(),</span> <span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="n">iterable</span><span class="o">.</span><span class="n">nblock</span><span class="p">)</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Stream&#39;</span><span class="p">,</span> <span class="s1">&#39;BlockStream&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">]</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;1970, Frederik Rietdijk.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.7</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>streaming.abstractstream &#8212; streaming 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="streaming 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for streaming.abstractstream</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Abstract Streams</span>
+<span class="sd">================</span>
+
+<span class="sd">The module :mod:`streaming.abtractstream` contains an abstract base class for streams.</span>
+<span class="sd">Furthermore, additional signatures are added to allow the operators defined in :mod:`streaming.operators` to work with `class:`streaming.abstractstream.AbstractStream`.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">multipledispatch.conflict</span> <span class="k">import</span> <span class="n">AmbiguityWarning</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">AmbiguityWarning</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">streaming</span>
+<span class="kn">from</span> <span class="nn">streaming.operators</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">streaming.itertools</span> <span class="k">import</span> <span class="o">*</span>
+
+<span class="kn">import</span> <span class="nn">cytoolz</span>
+<span class="c1">#from streaming.operators import _basic_objects</span>
+
+<span class="c1">## Add basic operators to module</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="n">_thismodule</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">__name__</span><span class="p">]</span>
+
+<span class="c1">#def _binary_operator(operator):</span>
+    <span class="c1">#&quot;&quot;&quot;Apply `operator` to binary inputs.</span>
+    <span class="c1">#&quot;&quot;&quot;</span>
+    <span class="c1">#def op(x, y):</span>
+        <span class="c1">#if isinstance(y, collections.Stream):</span>
+            <span class="c1">#yield from map(operator, x, y)</span>
+        <span class="c1">#else: # Consider it a constant</span>
+            <span class="c1">#yield from map(lambda i: operator(i, y) for i in x)</span>
+    <span class="c1">#return op</span>
+
+<span class="c1">#def _reversed_binary_operator(operator):</span>
+    <span class="c1">#&quot;&quot;&quot;Apply `operator` to binary inputs.</span>
+    <span class="c1">#&quot;&quot;&quot;</span>
+    <span class="c1">#def op(y, x):</span>
+        <span class="c1">#if isinstance(y, collections.Stream):</span>
+            <span class="c1">#yield from map(operator, x, y)</span>
+        <span class="c1">#else: # Consider it a constant</span>
+            <span class="c1">#yield from map(lambda i: operator(i, y) for i in x)</span>
+    <span class="c1">#return op</span>
+
+
+<span class="c1">###def _unary_operator(operator):</span>
+    <span class="c1">###&quot;&quot;&quot;Apply `operator` to unary input.</span>
+    <span class="c1">###&quot;&quot;&quot;</span>
+    <span class="c1">###def op(x):</span>
+        <span class="c1">###yield from map(operator, x)</span>
+    <span class="c1">###return op</span>
+
+
+<span class="c1">#class MetaStream(abc.ABCMeta):</span>
+
+    <span class="c1">#def __new__(cls, name, bases, attrs):</span>
+
+        <span class="c1">## Add binary operators</span>
+        <span class="c1">#for op in streaming.operators._BINARY_OPERATORS:</span>
+            <span class="c1">#attrs[&#39;__&#39;+op+&#39;__&#39;] = getattr(streaming.operators, op)</span>
+            <span class="c1">##attrs[&#39;__r&#39;+op+&#39;__&#39;] = _reversed_binary_operator(getattr(operator, op))</span>
+            <span class="c1">##attrs[&#39;__&#39;+op+&#39;__&#39;] = _binary_operator(getattr(operator, op))</span>
+            <span class="c1">##attrs[&#39;__r&#39;+op+&#39;__&#39;] = _reversed_binary_operator(getattr(operator, op))</span>
+            <span class="c1">##setattr(cls, &#39;__&#39;+op+&#39;__&#39;, getattr(streaming.operators, op))</span>
+        <span class="c1">#attrs[&#39;__div__&#39;] = attrs[&#39;__truediv__&#39;]</span>
+
+        <span class="c1">### Add unary operators</span>
+        <span class="c1">##for operator in _UNARY_OPERATORS:</span>
+            <span class="c1">##attrs[&#39;__&#39;+operator+&#39;__&#39;] = _unary_operator(operator)</span>
+
+        <span class="c1">#return super().__new__(cls, name, bases, attrs)</span>
+
+
+<span class="k">def</span> <span class="nf">_wrapped_binary_op</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">wrapped</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wrapped</span>
+
+<span class="k">def</span> <span class="nf">_reverse_wrapped_binary_op</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Swap inputs.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">reverser</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="c1">#print(&quot;Op: {}, Left: {}, Right {}&quot;.format(op, a, b))</span>
+        <span class="k">def</span> <span class="nf">wrapped</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+            <span class="c1">#print(&quot;Reversed, now Op: {}, Left: {}, Right {}&quot;.format(op, x, y))</span>
+            <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">wrapped</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">reverser</span>
+
+
+<span class="k">class</span> <span class="nc">Operators</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">attrs</span><span class="p">):</span>
+
+        <span class="n">cls</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__new__</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">attrs</span><span class="p">)</span>
+
+        <span class="kn">import</span> <span class="nn">streaming</span>
+
+        <span class="c1"># Add binary operators</span>
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="o">.</span><span class="n">_BINARY_OPERATORS</span><span class="p">:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="s1">&#39;__&#39;</span><span class="o">+</span><span class="n">op</span><span class="o">+</span><span class="s1">&#39;__&#39;</span><span class="p">,</span> <span class="n">_wrapped_binary_op</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="p">,</span> <span class="n">op</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="o">.</span><span class="n">_BINARY_OPERATORS</span><span class="p">:</span><span class="c1">#_WITH_REVERSE:</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">cls</span><span class="p">,</span> <span class="s1">&#39;__r&#39;</span><span class="o">+</span><span class="n">op</span><span class="o">+</span><span class="s1">&#39;__&#39;</span><span class="p">,</span> <span class="n">_reverse_wrapped_binary_op</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="p">,</span> <span class="n">op</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">cls</span>
+
+
+<div class="viewcode-block" id="AbstractStream"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream">[docs]</a><span class="k">class</span> <span class="nc">AbstractStream</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">Iterator</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">Operators</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Abstract stream.&quot;&quot;&quot;</span>
+
+    <span class="n">__array_priority__</span> <span class="o">=</span> <span class="mi">1000</span>
+    <span class="sd">&quot;&quot;&quot;Array priority is required to force usage of __radd__ in case left-side object is an `np.ndarray`.&quot;&quot;&quot;</span>
+    <span class="n">__numpy_ufunc__</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;Disable np ufuncs entirely, force usage of __rop__.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterator</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Iterable</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Iterable required, iterator preferred.&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">iterator</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Iterable</span><span class="p">):</span>
+            <span class="n">iterator</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">iterator</span><span class="p">)</span>
+
+        <span class="c1"># Try and find the actual iterator</span>
+        <span class="c1"># Could move this into elif</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">iterator</span>
+        <span class="k">while</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;_iterator&#39;</span><span class="p">):</span>
+            <span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">_iterator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span> <span class="o">=</span> <span class="n">obj</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+    <span class="c1">##def __bool__(self):</span>
+        <span class="c1">#return True</span>
+
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span>
+
+    <span class="k">def</span> <span class="nf">__next__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+
+    <span class="c1">#def _fastmap(self, func):</span>
+        <span class="c1">#return self.map(func)</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractproperty</span>
+    <span class="k">def</span> <span class="nf">nblock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Amount of samples per block.&quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">_construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct instance of this type from given `iterable`&quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<div class="viewcode-block" id="AbstractStream.blocks"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.blocks">[docs]</a>    <span class="k">def</span> <span class="nf">blocks</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Stream with blocks.</span>
+
+<span class="sd">        :rtype: :class:`BlockStream`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="AbstractStream.cos"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.cos">[docs]</a>    <span class="k">def</span> <span class="nf">cos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Cosine.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">)</span></div>
+
+    <span class="c1">#@abc.abstractmethod</span>
+<div class="viewcode-block" id="AbstractStream.copy"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.copy">[docs]</a>    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Make a copy of the stream.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">iterator</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">tee</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="n">iterator</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AbstractStream.cycle"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.cycle">[docs]</a>    <span class="k">def</span> <span class="nf">cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Cycle the stream.</span>
+
+<span class="sd">        .. seealso:: :func:`itertools.cycle`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">streaming</span><span class="o">.</span><span class="n">itertools</span><span class="o">.</span><span class="n">cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<div class="viewcode-block" id="AbstractStream.drop"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.drop">[docs]</a>    <span class="k">def</span> <span class="nf">drop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Drop the first `n` items.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="n">cytoolz</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="AbstractStream.exp"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.exp">[docs]</a>    <span class="k">def</span> <span class="nf">exp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Exponential.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">)</span></div>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<div class="viewcode-block" id="AbstractStream.map"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.map">[docs]</a>    <span class="k">def</span> <span class="nf">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Map `func` to each sample in `Stream`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span></div>
+        <span class="c1">#stream = self.samples()</span>
+        <span class="c1">#return type(stream)(map(func, stream))</span>
+
+    <span class="c1">#@abc.abstractmethod</span>
+    <span class="c1">#def mapblock(self, func):</span>
+        <span class="c1">#pass</span>
+
+<div class="viewcode-block" id="AbstractStream.nsamples"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.nsamples">[docs]</a>    <span class="k">def</span> <span class="nf">nsamples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Amount of samples in stream.</span>
+
+<span class="sd">        .. warning:: This consumes the stream.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="AbstractStream.peek"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.peek">[docs]</a>    <span class="k">def</span> <span class="nf">peek</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check the first item in the stream.&quot;&quot;&quot;</span>
+        <span class="n">first</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span> <span class="o">=</span> <span class="n">cytoolz</span><span class="o">.</span><span class="n">peek</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">first</span></div>
+
+<div class="viewcode-block" id="AbstractStream.repeat_each"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.repeat_each">[docs]</a>    <span class="k">def</span> <span class="nf">repeat_each</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Repeat each item `n` times before yielding the next.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">repeat_each</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span></div>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<div class="viewcode-block" id="AbstractStream.samples"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.samples">[docs]</a>    <span class="k">def</span> <span class="nf">samples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Stream with samples.</span>
+
+<span class="sd">        :rtype: :class:`Stream`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="AbstractStream.sin"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.sin">[docs]</a>    <span class="k">def</span> <span class="nf">sin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Sine.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AbstractStream.sqrt"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.sqrt">[docs]</a>    <span class="k">def</span> <span class="nf">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Square root.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">)</span></div>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<div class="viewcode-block" id="AbstractStream.take"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.take">[docs]</a>    <span class="k">def</span> <span class="nf">take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Take the first `n`.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="n">cytoolz</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="AbstractStream.take_nth"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.take_nth">[docs]</a>    <span class="k">def</span> <span class="nf">take_nth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Take every `n`th.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct</span><span class="p">(</span><span class="n">cytoolz</span><span class="o">.</span><span class="n">take_nth</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="AbstractStream.tan"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.tan">[docs]</a>    <span class="k">def</span> <span class="nf">tan</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Tangens.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">tan</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AbstractStream.tee"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.tee">[docs]</a>    <span class="k">def</span> <span class="nf">tee</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Split stream in `n` streams.</span>
+
+<span class="sd">        .. seealso:: :func:`itertools.tee`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">tee</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AbstractStream.toarray"><a class="viewcode-back" href="../../abstractstream.html#streaming.abstractstream.AbstractStream.toarray">[docs]</a>    <span class="k">def</span> <span class="nf">toarray</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Convert to array.</span>
+
+<span class="sd">        :rtype: :class:`np.ndarray`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">toarray</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div></div>
+
+
+<span class="c1"># Binary operators (AbstractStream, object)</span>
+<span class="k">def</span> <span class="nf">_binary_op_abstractstream_object</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">a</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (object, AbstractStream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_object_abstractstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">b</span><span class="o">.</span><span class="n">_iterator</span><span class="p">)</span>
+
+<span class="c1"># Binary operators (AbstractStream, AbstractStream)</span>
+<span class="k">def</span> <span class="nf">_binary_op_abstractstream_abstractstream</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">b</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="o">.</span><span class="n">_BINARY_OPERATORS</span><span class="p">:</span>
+    <span class="c1"># Get the dispatcher for this operation</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">operators</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+    <span class="c1"># And add the specific implementations</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">AbstractStream</span><span class="p">,</span> <span class="n">AbstractStream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_abstractstream_abstractstream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">AbstractStream</span><span class="p">,</span> <span class="nb">object</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_abstractstream_object</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+    <span class="n">D</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="nb">object</span><span class="p">,</span> <span class="n">AbstractStream</span><span class="p">),</span> <span class="n">partial</span><span class="p">(</span><span class="n">_binary_op_object_abstractstream</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+
+
+<span class="c1"># Itertools</span>
+
+<span class="nd">@tee</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">AbstractStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">AbstractStream</span><span class="p">(</span><span class="n">it</span><span class="p">)</span> <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">tee</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+<span class="nd">@cycle</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">AbstractStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="n">iterable</span><span class="p">)(</span><span class="n">itertools</span><span class="o">.</span><span class="n">cycle</span><span class="p">(</span><span class="n">iterable</span><span class="p">))</span>
+
+<span class="c1"># Other helpful functions</span>
+
+<span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">))</span>
+
+<span class="nd">@repeat_each</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">AbstractStream</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">AbstractStream</span><span class="p">(</span><span class="n">repeat_each</span><span class="p">(</span><span class="n">iterable</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;1970, Frederik Rietdijk.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.7</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

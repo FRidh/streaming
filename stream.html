@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>&lt;no title&gt; &#8212; streaming 0.1 documentation</title>
+    <title>Stream &#8212; streaming 0.1 documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -24,8 +24,8 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <link rel="top" title="streaming 0.1 documentation" href="index.html" />
-    <link rel="next" title="&lt;no title&gt;" href="signal.html" />
-    <link rel="prev" title="&lt;no title&gt;" href="abstractstream.html" />
+    <link rel="next" title="Signal Processing" href="signal.html" />
+    <link rel="prev" title="Abstract Streams" href="abstractstream.html" />
    
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
@@ -38,7 +38,121 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  
+  <span class="target" id="module-streaming.stream"></span><div class="section" id="stream">
+<h1>Stream<a class="headerlink" href="#stream" title="Permalink to this headline">¶</a></h1>
+<p>The Stream module contains the classes <a class="reference internal" href="#streaming.stream.Stream" title="streaming.stream.Stream"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></a> and <a class="reference internal" href="#streaming.stream.BlockStream" title="streaming.stream.BlockStream"><code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code></a>.</p>
+<dl class="class">
+<dt id="streaming.stream.Stream">
+<em class="property">class </em><code class="descclassname">streaming.stream.</code><code class="descname">Stream</code><span class="sig-paren">(</span><em>iterator</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#Stream"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.Stream" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="abstractstream.html#streaming.abstractstream.AbstractStream" title="streaming.abstractstream.AbstractStream"><code class="xref py py-class docutils literal"><span class="pre">streaming.abstractstream.AbstractStream</span></code></a></p>
+<p>Stream of samples.</p>
+<dl class="method">
+<dt id="streaming.stream.Stream.drop">
+<code class="descname">drop</code><span class="sig-paren">(</span><em>nsamples</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#Stream.drop"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.Stream.drop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Drop the first <cite>n</cite> samples.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.Stream.take">
+<code class="descname">take</code><span class="sig-paren">(</span><em>nsamples</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#Stream.take"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.Stream.take" title="Permalink to this definition">¶</a></dt>
+<dd><p>Take the first <cite>nsamples</cite> samples.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="streaming.stream.BlockStream">
+<em class="property">class </em><code class="descclassname">streaming.stream.</code><code class="descname">BlockStream</code><span class="sig-paren">(</span><em>iterator</em>, <em>nblock</em>, <em>noverlap=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="abstractstream.html#streaming.abstractstream.AbstractStream" title="streaming.abstractstream.AbstractStream"><code class="xref py py-class docutils literal"><span class="pre">streaming.abstractstream.AbstractStream</span></code></a></p>
+<p>Stream of blocks of samples.</p>
+<dl class="method">
+<dt id="streaming.stream.BlockStream.drop">
+<code class="descname">drop</code><span class="sig-paren">(</span><em>n</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.drop"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.drop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Drop the first <cite>n</cite> blocks.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If you want to drop <cite>n</cite> samples, use <cite>s.samples().drop(n)</cite>.</p>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.map">
+<code class="descname">map</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.map"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.map" title="Permalink to this definition">¶</a></dt>
+<dd><p>Map <cite>func</cite> to each block in <a class="reference internal" href="#streaming.stream.BlockStream" title="streaming.stream.BlockStream"><code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.mean">
+<code class="descname">mean</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.mean"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.mean" title="Permalink to this definition">¶</a></dt>
+<dd><p>Mean value calculated over <cite>nblock</cite> samples.</p>
+<p>This function returns a <a class="reference internal" href="#streaming.stream.Stream" title="streaming.stream.Stream"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.nblocks">
+<code class="descname">nblocks</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.nblocks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.nblocks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Amount of blocks in stream.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">This consumes the stream.</p>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.samples">
+<code class="descname">samples</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.samples"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.samples" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate over samples.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">Stream of samples insteads of blocks. Possible overlap is taking into account.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.std">
+<code class="descname">std</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.std"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.std" title="Permalink to this definition">¶</a></dt>
+<dd><p>Standard deviation calculated over <cite>nblock</cite> samples.</p>
+<p>This function returns a <a class="reference internal" href="#streaming.stream.Stream" title="streaming.stream.Stream"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.sum">
+<code class="descname">sum</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.sum"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.sum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sum calculated over <cite>nblock</cite> samples.</p>
+<p>This function returns a <a class="reference internal" href="#streaming.stream.Stream" title="streaming.stream.Stream"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.take">
+<code class="descname">take</code><span class="sig-paren">(</span><em>nblocks</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.take"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.take" title="Permalink to this definition">¶</a></dt>
+<dd><p>Take <cite>nblocks</cite> from stream.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="streaming.stream.BlockStream.var">
+<code class="descname">var</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#BlockStream.var"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.BlockStream.var" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variance calculated over <cite>nblock</cite> samples.</p>
+<p>This function returns a <a class="reference internal" href="#streaming.stream.Stream" title="streaming.stream.Stream"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></a>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.stream.count">
+<code class="descclassname">streaming.stream.</code><code class="descname">count</code><span class="sig-paren">(</span><em>start=0</em>, <em>step=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/stream.html#count"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.stream.count" title="Permalink to this definition">¶</a></dt>
+<dd><p>Count.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><a class="reference external" href="https://docs.python.org/3/library/itertools.html#itertools.count" title="(in Python v3.5)"><code class="xref py py-func docutils literal"><span class="pre">itertools.count()</span></code></a></p>
+</div>
+</dd></dl>
+
+</div>
+
 
           </div>
         </div>
@@ -48,8 +162,8 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="abstractstream.html" title="previous chapter">&lt;no title&gt;</a></li>
-      <li>Next: <a href="signal.html" title="next chapter">&lt;no title&gt;</a></li>
+      <li>Previous: <a href="abstractstream.html" title="previous chapter">Abstract Streams</a></li>
+      <li>Next: <a href="signal.html" title="next chapter">Signal Processing</a></li>
   </ul></li>
 </ul>
 </div>

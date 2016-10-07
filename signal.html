@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>&lt;no title&gt; &#8212; streaming 0.1 documentation</title>
+    <title>Signal Processing &#8212; streaming 0.1 documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -24,8 +24,8 @@
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <link rel="top" title="streaming 0.1 documentation" href="index.html" />
-    <link rel="next" title="&lt;no title&gt;" href="_iterator.html" />
-    <link rel="prev" title="&lt;no title&gt;" href="stream.html" />
+    <link rel="next" title="Iterator" href="_iterator.html" />
+    <link rel="prev" title="Stream" href="stream.html" />
    
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
@@ -38,7 +38,214 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  
+  <span class="target" id="module-streaming.signal"></span><div class="section" id="signal-processing">
+<h1>Signal Processing<a class="headerlink" href="#signal-processing" title="Permalink to this headline">¶</a></h1>
+<p>The Signal Processing module contains functions for signal processing.</p>
+<dl class="function">
+<dt id="streaming.signal.constant">
+<code class="descclassname">streaming.signal.</code><code class="descname">constant</code><span class="sig-paren">(</span><em>value</em>, <em>nblock=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#constant"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.constant" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stream with constant value.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code> or <code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code> if <cite>nblock</cite> is not <cite>None</cite>.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.convolve">
+<code class="descclassname">streaming.signal.</code><code class="descname">convolve</code><span class="sig-paren">(</span><em>signal</em>, <em>impulse_responses</em>, <em>nhop</em>, <em>ntaps</em>, <em>initial_values=None</em><span class="sig-paren">)</span><a class="headerlink" href="#streaming.signal.convolve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convolve <cite>signal</cite> with <cite>impulse_responses</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>signal</strong> (<code class="xref py py-class docutils literal"><span class="pre">Stream</span></code> or <code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code>) &#8211; Signal</li>
+<li><strong>impulse_responses</strong> &#8211; <code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></li>
+<li><strong>ntaps</strong> &#8211; Amount of taps.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Convolution of <cite>signal</cite> with <cite>impulse_responses</cite>.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code></p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><code class="xref py py-func docutils literal"><span class="pre">streaming._iterator.blocked_convolve()</span></code></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.convolve_overlap_add">
+<code class="descclassname">streaming.signal.</code><code class="descname">convolve_overlap_add</code><span class="sig-paren">(</span><em>signal</em>, <em>impulse_responses</em>, <em>nhop</em>, <em>ntaps</em>, <em>initial_values=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#convolve_overlap_add"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.convolve_overlap_add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convolve <cite>signal</cite> with <cite>impulse_responses</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>signal</strong> (<code class="xref py py-class docutils literal"><span class="pre">Stream</span></code> or <code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code>) &#8211; Signal</li>
+<li><strong>impulse_responses</strong> &#8211; <code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></li>
+<li><strong>ntaps</strong> &#8211; Amount of taps.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Convolution of <cite>signal</cite> with <cite>impulse_responses</cite>.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><code class="xref py py-class docutils literal"><span class="pre">BlockStream</span></code></p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><code class="xref py py-func docutils literal"><span class="pre">streaming._iterator.blocked_convolve()</span></code></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.convolve_overlap_save">
+<code class="descclassname">streaming.signal.</code><code class="descname">convolve_overlap_save</code><span class="sig-paren">(</span><em>signal</em>, <em>impulse_responses</em>, <em>nhop</em>, <em>ntaps</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#convolve_overlap_save"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.convolve_overlap_save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convolve signal with linear time-variant <cite>impulse_responses</cite> using overlap-save method.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>signal</strong> &#8211; Signal.</li>
+<li><strong>impulse_responses</strong> &#8211; Impulse responses of the filter. Each impulse response belongs to a hop.</li>
+<li><strong>nhop</strong> &#8211; Hop in samples.</li>
+<li><strong>ntaps</strong> &#8211; Length of each impulse response.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Stream with blocksize equal to <cite>nhop</cite>.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="stream.html#streaming.stream.BlockStream" title="streaming.stream.BlockStream">BlockStream</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.interpolate">
+<code class="descclassname">streaming.signal.</code><code class="descname">interpolate</code><span class="sig-paren">(</span><em>x</em>, <em>y</em>, <em>xnew</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#interpolate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.interpolate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interpolate <cite>y</cite> at <cite>xnew</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>x</strong> &#8211; Previous sample positions</li>
+<li><strong>y</strong> &#8211; Previous sample values</li>
+<li><strong>xnew</strong> &#8211; New sample positions</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Interpolated sample positions</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><a class="reference internal" href="_iterator.html#streaming._iterator.interpolate_linear" title="streaming._iterator.interpolate_linear"><code class="xref py py-func docutils literal"><span class="pre">streaming._iterator.interpolate_linear()</span></code></a></p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.noise">
+<code class="descclassname">streaming.signal.</code><code class="descname">noise</code><span class="sig-paren">(</span><em>nblock=None</em>, <em>state=None</em>, <em>color='white'</em>, <em>ntaps=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#noise"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.noise" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate white noise with standard Gaussian distribution.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>nblock</strong> &#8211; Amount of samples per block.</li>
+<li><strong>state</strong> (<code class="xref py py-class docutils literal"><span class="pre">np.random.RandomState</span></code>) &#8211; State of PRNG.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">When <cite>nblock=None</cite>, individual samples are generated and a <code class="xref py py-class docutils literal"><span class="pre">streaming.Stream</span></code> is</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>returned. When integer, a <code class="xref py py-class docutils literal"><span class="pre">streaming.BlockStream</span></code> is returned.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.sine">
+<code class="descclassname">streaming.signal.</code><code class="descname">sine</code><span class="sig-paren">(</span><em>frequency</em>, <em>fs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#sine"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.sine" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sine with <cite>frequency</cite> and sample frequency <cite>fs</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>frequency</strong> &#8211; Frequency of the sine.</li>
+<li><strong>fs</strong> &#8211; Sample frequency.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Sine.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="streaming.signal.vdl">
+<code class="descclassname">streaming.signal.</code><code class="descname">vdl</code><span class="sig-paren">(</span><em>signal</em>, <em>times</em>, <em>delay</em>, <em>initial_value=0.0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/streaming/signal.html#vdl"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#streaming.signal.vdl" title="Permalink to this definition">¶</a></dt>
+<dd><p>Variable delay line which delays <cite>signal</cite> at <cite>times</cite> with <cite>delay</cite>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>signal</strong> &#8211; Signal to be delayed.</li>
+<li><strong>times</strong> &#8211; Sample times corresponding to signal before delay.</li>
+<li><strong>delay</strong> &#8211; Delays to apply to signal.</li>
+<li><strong>initial_value</strong> &#8211; Value to return before first sample.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Delayed version of <cite>signal</cite>.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><code class="xref py py-class docutils literal"><span class="pre">Stream</span></code></p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="first admonition-title">See also</p>
+<p class="last"><a class="reference internal" href="_iterator.html#streaming._iterator.vdl" title="streaming._iterator.vdl"><code class="xref py py-func docutils literal"><span class="pre">streaming._iterator.vdl()</span></code></a></p>
+</div>
+</dd></dl>
+
+</div>
+
 
           </div>
         </div>
@@ -48,8 +255,8 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="stream.html" title="previous chapter">&lt;no title&gt;</a></li>
-      <li>Next: <a href="_iterator.html" title="next chapter">&lt;no title&gt;</a></li>
+      <li>Previous: <a href="stream.html" title="previous chapter">Stream</a></li>
+      <li>Next: <a href="_iterator.html" title="next chapter">Iterator</a></li>
   </ul></li>
 </ul>
 </div>

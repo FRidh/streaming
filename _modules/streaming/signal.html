@@ -1,0 +1,293 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>streaming.signal &#8212; streaming 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="streaming 0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for streaming.signal</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Signal Processing</span>
+<span class="sd">=================</span>
+<span class="sd">The Signal Processing module contains functions for signal processing.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">multipledispatch</span> <span class="k">import</span> <span class="n">dispatch</span><span class="p">,</span> <span class="n">Dispatcher</span>
+<span class="kn">import</span> <span class="nn">numbers</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">noisy</span>
+<span class="kn">import</span> <span class="nn">streaming</span>
+<span class="kn">from</span> <span class="nn">streaming.stream</span> <span class="k">import</span> <span class="n">Stream</span><span class="p">,</span> <span class="n">BlockStream</span><span class="p">,</span> <span class="n">count</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">singledispatch</span>
+<span class="kn">from</span> <span class="nn">streaming._iterator</span> <span class="k">import</span> <span class="n">_convolve</span>
+
+
+
+<div class="viewcode-block" id="constant"><a class="viewcode-back" href="../../signal.html#streaming.signal.constant">[docs]</a><span class="k">def</span> <span class="nf">constant</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">nblock</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Stream with constant value.</span>
+
+<span class="sd">    :rtype: :class:`Stream` or :class:`BlockStream` if `nblock` is not `None`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">nblock</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">BlockStream</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">nblock</span><span class="p">)</span><span class="o">*</span><span class="n">value</span><span class="p">],</span> <span class="n">nblock</span><span class="p">)</span><span class="o">.</span><span class="n">cycle</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Stream</span><span class="p">([</span><span class="n">value</span><span class="p">])</span><span class="o">.</span><span class="n">cycle</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="convolve_overlap_add"><a class="viewcode-back" href="../../signal.html#streaming.signal.convolve_overlap_add">[docs]</a><span class="k">def</span> <span class="nf">convolve_overlap_add</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">,</span> <span class="n">nhop</span><span class="p">,</span> <span class="n">ntaps</span><span class="p">,</span> <span class="n">initial_values</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve `signal` with `impulse_responses`.</span>
+
+<span class="sd">    :param signal: Signal</span>
+<span class="sd">    :type signal: :class:`Stream` or :class:`BlockStream`</span>
+<span class="sd">    :param impulse_responses: :class:`Stream`</span>
+<span class="sd">    :param ntaps: Amount of taps.</span>
+<span class="sd">    :returns: Convolution of `signal` with `impulse_responses`.</span>
+<span class="sd">    :rtype: :class:`BlockStream`</span>
+
+<span class="sd">    .. seealso:: :func:`streaming._iterator.blocked_convolve`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">noverlap</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">signal</span> <span class="o">=</span> <span class="n">signal</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="n">nhop</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="n">noverlap</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">BlockStream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">convolve_overlap_add</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">nhop</span><span class="o">=</span><span class="n">nhop</span><span class="p">,</span> <span class="n">ntaps</span><span class="o">=</span><span class="n">ntaps</span><span class="p">,</span>
+                                                       <span class="n">initial_values</span><span class="o">=</span><span class="n">initial_values</span><span class="p">),</span> <span class="n">nblock</span><span class="o">=</span><span class="n">nhop</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="n">noverlap</span><span class="p">)</span></div>
+
+<span class="c1"># Backwards compatibility</span>
+<span class="n">convolve</span> <span class="o">=</span> <span class="n">convolve_overlap_add</span>
+
+
+<div class="viewcode-block" id="convolve_overlap_save"><a class="viewcode-back" href="../../signal.html#streaming.signal.convolve_overlap_save">[docs]</a><span class="k">def</span> <span class="nf">convolve_overlap_save</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">impulse_responses</span><span class="p">,</span> <span class="n">nhop</span><span class="p">,</span> <span class="n">ntaps</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convolve signal with linear time-variant `impulse_responses` using overlap-save method.</span>
+
+<span class="sd">    :param signal: Signal.</span>
+<span class="sd">    :param impulse_responses: Impulse responses of the filter. Each impulse response belongs to a hop.</span>
+<span class="sd">    :param nhop: Hop in samples.</span>
+<span class="sd">    :param ntaps: Length of each impulse response.</span>
+<span class="sd">    :returns: Stream with blocksize equal to `nhop`.</span>
+<span class="sd">    :rtype: BlockStream</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#return BlockStream(streaming._iterator.convolve_overlap_save(signal.samples()._iterator, impulse_responses._iterator, nhop, ntaps), nblock=nhop)</span>
+
+    <span class="c1"># It can be more efficient to repeat code here, because with Stream/BlockStream we don&#39;t always need to convert from sample-based to block-based.</span>
+    <span class="n">nwindow</span> <span class="o">=</span> <span class="n">nhop</span> <span class="o">+</span> <span class="n">ntaps</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">noverlap</span> <span class="o">=</span> <span class="n">ntaps</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">windows</span> <span class="o">=</span> <span class="n">signal</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="n">nblock</span><span class="o">=</span><span class="n">nwindow</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="n">noverlap</span><span class="p">)</span>
+    <span class="c1"># Convolve function to use</span>
+    <span class="n">_convolve_func</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">_convolve</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;valid&#39;</span><span class="p">)</span>
+    <span class="c1"># Convolved blocks</span>
+    <span class="n">convolved</span> <span class="o">=</span> <span class="n">BlockStream</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">_convolve_func</span><span class="p">,</span> <span class="n">windows</span><span class="p">,</span> <span class="n">impulse_responses</span> <span class="p">)),</span> <span class="n">nblock</span><span class="o">=</span><span class="n">nhop</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">convolved</span></div>
+
+
+<div class="viewcode-block" id="vdl"><a class="viewcode-back" href="../../signal.html#streaming.signal.vdl">[docs]</a><span class="k">def</span> <span class="nf">vdl</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="n">delay</span><span class="p">,</span> <span class="n">initial_value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Variable delay line which delays `signal` at `times` with `delay`.</span>
+
+<span class="sd">    :param signal: Signal to be delayed.</span>
+<span class="sd">    :param times: Sample times corresponding to signal before delay.</span>
+<span class="sd">    :param delay: Delays to apply to signal.</span>
+<span class="sd">    :param initial_value: Value to return before first sample.</span>
+<span class="sd">    :returns: Delayed version of `signal`.</span>
+<span class="sd">    :rtype: :class:`Stream`</span>
+
+<span class="sd">    .. seealso:: :func:`streaming._iterator.vdl`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">vdl</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">times</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">delay</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">initial_value</span><span class="o">=</span><span class="n">initial_value</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="interpolate"><a class="viewcode-back" href="../../signal.html#streaming.signal.interpolate">[docs]</a><span class="k">def</span> <span class="nf">interpolate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">xnew</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Interpolate `y` at `xnew`.</span>
+
+<span class="sd">    :param x: Previous sample positions</span>
+<span class="sd">    :param y: Previous sample values</span>
+<span class="sd">    :param xnew: New sample positions</span>
+<span class="sd">    :returns: Interpolated sample positions</span>
+<span class="sd">    :rtype: :class:`Stream`</span>
+
+<span class="sd">    .. seealso:: :func:`streaming._iterator.interpolate_linear`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">interpolate_linear</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">y</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">xnew</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="sine"><a class="viewcode-back" href="../../signal.html#streaming.signal.sine">[docs]</a><span class="k">def</span> <span class="nf">sine</span><span class="p">(</span><span class="n">frequency</span><span class="p">,</span> <span class="n">fs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sine with `frequency` and sample frequency `fs`.</span>
+
+<span class="sd">    :param frequency: Frequency of the sine.</span>
+<span class="sd">    :param fs: Sample frequency.</span>
+<span class="sd">    :returns: Sine.</span>
+<span class="sd">    :rtype: :class:`Stream`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mf">2.</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="n">frequency</span><span class="o">*</span><span class="n">times</span><span class="p">(</span><span class="mf">1.</span><span class="o">/</span><span class="n">fs</span><span class="p">))</span></div>
+
+
+<span class="k">def</span> <span class="nf">times</span><span class="p">(</span><span class="n">dt</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Number</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">count</span><span class="p">(</span><span class="n">step</span><span class="o">=</span><span class="n">dt</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;dt has to be a scalar number.&quot;</span><span class="p">)</span>
+
+
+
+
+<div class="viewcode-block" id="noise"><a class="viewcode-back" href="../../signal.html#streaming.signal.noise">[docs]</a><span class="k">def</span> <span class="nf">noise</span><span class="p">(</span><span class="n">nblock</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;white&#39;</span><span class="p">,</span> <span class="n">ntaps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Generate white noise with standard Gaussian distribution.</span>
+
+<span class="sd">    :param nblock: Amount of samples per block.</span>
+<span class="sd">    :param state: State of PRNG.</span>
+<span class="sd">    :type state: :class:`np.random.RandomState`</span>
+<span class="sd">    :returns: When `nblock=None`, individual samples are generated and a :class:`streaming.Stream` is</span>
+<span class="sd">    returned. When integer, a :class:`streaming.BlockStream` is returned.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">()</span>
+
+    <span class="c1"># Generate white noise</span>
+    <span class="k">if</span> <span class="n">nblock</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Generate individual samples.</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">Stream</span><span class="p">((</span><span class="n">state</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">()))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Generate blocks.</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">BlockStream</span><span class="p">((</span><span class="n">state</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">nblock</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">()),</span> <span class="n">nblock</span><span class="o">=</span><span class="n">nblock</span><span class="p">,</span> <span class="n">noverlap</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Apply filter for specific color</span>
+    <span class="k">if</span> <span class="n">color</span> <span class="ow">is</span> <span class="ow">not</span> <span class="s1">&#39;white&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ntaps</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Amount of taps has not been specified.&quot;</span><span class="p">)</span>
+        <span class="n">ir</span> <span class="o">=</span> <span class="n">noisy</span><span class="o">.</span><span class="n">COLORS</span><span class="p">[</span><span class="n">color</span><span class="p">](</span><span class="n">ntaps</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">nblock</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">nhop</span> <span class="o">=</span> <span class="n">ntaps</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nhop</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">nblock</span><span class="p">,</span> <span class="n">ntaps</span><span class="p">)</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">convolve_overlap_add</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">constant</span><span class="p">(</span><span class="n">ir</span><span class="p">),</span> <span class="n">nhop</span><span class="p">,</span> <span class="n">ntaps</span><span class="p">)</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">ntaps</span><span class="o">//</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Output as desired</span>
+    <span class="k">if</span> <span class="n">nblock</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">stream</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">stream</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="n">nblock</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">cumsum</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Cumulative sum.</span>
+
+<span class="sd">    .. seealso:: :func:`itertools.accumulate`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">diff</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Differentiate `x`.</span>
+
+<span class="sd">    :returns: Differentiated `x`.</span>
+<span class="sd">    :rtype: :class:`Stream`</span>
+
+<span class="sd">    .. seealso:: :func:`streaming._iterator.diff`</span>
+<span class="sd">    .. note:: Typically when differentiating one needs to multiple as well with the sample frequency</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">filter_ba</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Apply IIR filter to `x`.</span>
+
+<span class="sd">    :param x: Signal.</span>
+<span class="sd">    :param b: Numerator coefficients.</span>
+<span class="sd">    :param a: Denominator coefficients.</span>
+<span class="sd">    :returns: Filtered signal.</span>
+
+<span class="sd">    .. seealso:: :func:`scipy.signal.lfilter`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">filter_ba</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">filter_sos</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">sos</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Apply IIR filter to `x`.</span>
+
+<span class="sd">    :param x: Signal.</span>
+<span class="sd">    :param sos: Second-order sections.</span>
+<span class="sd">    :returns: Filtered signal.</span>
+
+<span class="sd">    .. seealso:: :func:`scipy.signal.sosfilt`</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Stream</span><span class="p">(</span><span class="n">streaming</span><span class="o">.</span><span class="n">_iterator</span><span class="o">.</span><span class="n">filter_sos</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">samples</span><span class="p">()</span><span class="o">.</span><span class="n">_iterator</span><span class="p">,</span> <span class="n">sos</span><span class="p">))</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="s1">&#39;convolve&#39;</span><span class="p">,</span> <span class="s1">&#39;convolve_overlap_add&#39;</span><span class="p">,</span> <span class="s1">&#39;convolve_overlap_save&#39;</span><span class="p">,</span> <span class="s1">&#39;interpolate&#39;</span><span class="p">,</span> <span class="s1">&#39;noise&#39;</span><span class="p">,</span> <span class="s1">&#39;sine&#39;</span><span class="p">,</span> <span class="s1">&#39;times&#39;</span><span class="p">,</span> <span class="s1">&#39;vdl&#39;</span><span class="p">]</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;1970, Frederik Rietdijk.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.7</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
