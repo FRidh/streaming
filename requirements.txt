@@ -2,3 +2,4 @@ cython
 cytoolz
 multipledispatch
 numpy
+noisy
