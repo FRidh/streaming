@@ -26,7 +26,7 @@ CLASSIFIERS = [
 
 setup(
     name='streaming',
-    version='0.1.1',
+    version='0.1.2',
     description="Streaming data with Python",
     author='Frederik Rietdijk',
     author_email='freddyrietdijk@fridh.nl',
