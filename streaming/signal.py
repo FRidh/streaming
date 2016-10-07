@@ -207,19 +207,4 @@ def filter_sos(x, sos):
     return Stream(streaming._iterator.filter_sos(x.samples()._iterator, sos))
 
 
-
-
-#def integrate(x):
-    #"""Integrate `x`.
-    #"""
-    #return
-
-
-
-#class Filterbank(object):
-
-    #def __init__(self, frequencies):
-        #pass
-
-
 __all__ = ['constant', 'convolve', 'convolve_overlap_add', 'convolve_overlap_save', 'interpolate', 'noise', 'sine', 'times', 'vdl']
