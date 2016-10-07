@@ -1,0 +1,1 @@
+.. automodule:: streaming._iterator

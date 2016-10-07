@@ -1,0 +1,1 @@
+Search.setIndex({envversion:50,filenames:["_iterator","abstractstream","index","signal","stream"],objects:{},objnames:{},objtypes:{},terms:{content:2,index:2,modul:2,page:2,search:2},titles:["&lt;no title&gt;","&lt;no title&gt;","Welcome to streaming&#8217;s documentation!","&lt;no title&gt;","&lt;no title&gt;"],titleterms:{"":2,document:2,indice:2,stream:2,tabl:2,welcom:2}})
