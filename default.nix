@@ -5,7 +5,7 @@
 , multipledispatch
 , numpy
 , noisy
-}
+}:
 
 buildPythonPackage rec {
   name = "streaming-${version}";
