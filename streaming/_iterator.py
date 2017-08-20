@@ -18,7 +18,9 @@ try:
 except ImportError:
     _convolve = np.convolve
 
-def blocks(iterable, nblock, noverlap=0):
+NO_PAD = '__no__pad__'
+
+def blocks(iterable, nblock, noverlap=0, pad=NO_PAD):
     """Partition iterable into blocks.
 
     :param iterable: Iterable.
@@ -29,12 +31,12 @@ def blocks(iterable, nblock, noverlap=0):
     """
     # We use a different function for performance reasons
     if noverlap==0:
-        return _blocks(iterable, nblock)
+        return _blocks(iterable, nblock, pad)
     else:
-        return _overlapping_blocks(iterable, nblock, noverlap)
+        return _overlapping_blocks(iterable, nblock, noverlap, pad)
 
 
-def _blocks(iterable, nblock):
+def _blocks(iterable, nblock, pad):
     """Partition iterable into blocks.
 
     :param iterable: Iterable.
@@ -43,11 +45,11 @@ def _blocks(iterable, nblock):
 
     """
     iterator = iter(iterable)
-    partitions = cytoolz.partition(nblock, iterator)
+    partitions = cytoolz.partition(nblock, iterator, pad)
     yield from partitions
 
 
-def _overlapping_blocks(iterable, nblock, noverlap):
+def _overlapping_blocks(iterable, nblock, noverlap, pad):
     """Partition iterable into overlapping blocks of size `nblock`.
 
     :param iterable: Iterable.
@@ -63,7 +65,7 @@ def _overlapping_blocks(iterable, nblock, noverlap):
 
     # First `noverlap` samples
     previous = list(cytoolz.take(noverlap, iterator))
-    advances = map(list, cytoolz.partition(nadvance, iterator))
+    advances = map(list, cytoolz.partition(nadvance, iterator, pad))
 
     for advance in advances:
         block = previous + advance # Concat lists
@@ -71,7 +73,7 @@ def _overlapping_blocks(iterable, nblock, noverlap):
         previous = block[-noverlap:]
 
 
-def change_blocks(iterator, nblock, noverlap, nblock_new, noverlap_new):
+def change_blocks(iterator, nblock, noverlap, nblock_new, noverlap_new, pad=NO_PAD):
     """Change blocksize and/or overlap of iterator.
 
     :param iterator: Iterator.
@@ -92,20 +94,20 @@ def change_blocks(iterator, nblock, noverlap, nblock_new, noverlap_new):
         # factor is multiple of current blocksize
         factor = nblock_new // nblock
         # therefore we concat `factor` blocks into a new block
-        partitioned = map(np.concatenate, cytoolz.partition(factor, iterator))
+        partitioned = map(np.concatenate, cytoolz.partition(factor, iterator, pad))
         return partitioned
 
     # Old block size is multiple of new block size, sample overlap
     elif not nblock % nblock_new and noverlap_new==noverlap:
         # Partition each block in blocks with size nblock_new
-        partition = lambda x: cytoolz.partition(nblock_new, x)
+        partition = lambda x: cytoolz.partition(nblock_new, x, pad)
         # And chain the iterables
         partitioned = itertools.chain.from_iterable(map(partition, iterator))
         return partitioned
 
     # Convert to samples and create blocks
     else:
-        return blocks(samples(iterator, nblock, noverlap), nblock_new, noverlap_new)
+        return blocks(samples(iterator, nblock, noverlap), nblock_new, noverlap_new, pad)
 
 
 def samples(iterator, nblock, noverlap=0):
@@ -123,7 +125,7 @@ def samples(iterator, nblock, noverlap=0):
 
 # Some convenience functions
 
-def sliding_mean(iterable, nwindow, noverlap=0):
+def sliding_mean(iterable, nwindow, noverlap=0, pad=NO_PAD):
     """Sliding mean.
 
     :param iterable: Iterable.
@@ -131,10 +133,10 @@ def sliding_mean(iterable, nwindow, noverlap=0):
     :param noverlap: Amount of samples to overlap.
     :returns: Iterable of means.
     """
-    yield from map(np.mean, blocks(iterable, nwindow, noverlap))
+    yield from map(np.mean, blocks(iterable, nwindow, noverlap, pad))
 
 
-def sliding_std(iterable, nwindow, noverlap=0):
+def sliding_std(iterable, nwindow, noverlap=0, pad=NO_PAD):
     """Sliding standard deviation.
 
     :param iterable: Iterable.
@@ -142,10 +144,10 @@ def sliding_std(iterable, nwindow, noverlap=0):
     :param noverlap: Amount of samples to overlap.
     :returns: Iterable of standard deviations.
     """
-    yield from map(np.std, blocks(iterable, nwindow, noverlap))
+    yield from map(np.std, blocks(iterable, nwindow, noverlap, pad))
 
 
-def sliding_var(iterable, nwindow, noverlap=0):
+def sliding_var(iterable, nwindow, noverlap=0, pad=NO_PAD):
     """Sliding variance.
 
     :param iterable: Iterable.
@@ -153,7 +155,7 @@ def sliding_var(iterable, nwindow, noverlap=0):
     :param noverlap: Amount of samples to overlap.
     :returns: Iterable of standard deviations.
     """
-    yield from map(np.var, blocks(iterable, nwindow, noverlap))
+    yield from map(np.var, blocks(iterable, nwindow, noverlap, pad))
 
 
 # Convolution
@@ -262,7 +264,7 @@ def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=
         yield resulting_block
 
 
-def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_out=None):
+def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_out=None, pad=NO_PAD):
     """Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.
 
     :param signal: Signal. Can either consists of blocks or samples. `nblock_in` should be set to the block size of the signal.
@@ -304,7 +306,7 @@ def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_ou
         nblock_in = ntaps
         nblock_out = nblock_in - ntaps + 1
 
-    windows = blocks(signal, nblock_in, noverlap)
+    windows = blocks(signal, nblock_in, noverlap, pad)
 
     ## We have sample-based signal and we want blocks with specified size out.
     #if nblock_in is None and nblock_out is not None:
@@ -337,7 +339,7 @@ def convolve_overlap_discard(signal, impulse_response, nblock_in=None, nblock_ou
     return convolved, nblock_out
 
 
-def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
+def convolve_overlap_save(signal, impulse_responses, nhop, ntaps, pad=NO_PAD):
     """Convolve signal with linear time-invariant `impulse_response` using overlap-discard method.
 
     :param signal: Signal. Consists of samples.
@@ -351,7 +353,7 @@ def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
     """
     nwindow = nhop + ntaps - 1
     noverlap = ntaps - 1
-    windows = blocks(signal, nwindow, noverlap)
+    windows = blocks(signal, nwindow, noverlap, pad)
     # Convolve function to use
     _convolve_func = lambda x, y: _convolve(x, y, mode='valid')
     # Convolved blocks

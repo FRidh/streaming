@@ -29,7 +29,7 @@ def constant(value, nblock=None):
         return Stream([value]).cycle()
 
 
-def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=None):
+def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=None, pad=NO_PAD):
     """Convolve `signal` with `impulse_responses`.
 
     :param signal: Signal
@@ -42,7 +42,7 @@ def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=
     .. seealso:: :func:`streaming._iterator.blocked_convolve`
     """
     noverlap = 0
-    signal = signal.blocks(nhop, noverlap=noverlap)
+    signal = signal.blocks(nhop, noverlap=noverlap, pad=NO_PAD)
     return BlockStream(streaming._iterator.convolve_overlap_add(signal._iterator, impulse_responses._iterator, nhop=nhop, ntaps=ntaps,
                                                        initial_values=initial_values), nblock=nhop, noverlap=noverlap)
 
@@ -50,7 +50,7 @@ def convolve_overlap_add(signal, impulse_responses, nhop, ntaps, initial_values=
 convolve = convolve_overlap_add
 
 
-def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
+def convolve_overlap_save(signal, impulse_responses, nhop, ntaps, pad=NO_PAD):
     """Convolve signal with linear time-variant `impulse_responses` using overlap-save method.
 
     :param signal: Signal.
@@ -66,7 +66,7 @@ def convolve_overlap_save(signal, impulse_responses, nhop, ntaps):
     # It can be more efficient to repeat code here, because with Stream/BlockStream we don't always need to convert from sample-based to block-based.
     nwindow = nhop + ntaps - 1
     noverlap = ntaps - 1
-    windows = signal.blocks(nblock=nwindow, noverlap=noverlap)
+    windows = signal.blocks(nblock=nwindow, noverlap=noverlap, pad=NO_PAD)
     # Convolve function to use
     _convolve_func = lambda x, y: _convolve(x, y, mode='valid')
     # Convolved blocks

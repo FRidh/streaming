@@ -20,6 +20,8 @@ from streaming.operators import *
 from streaming.abstractstream import *
 from streaming.itertools import *
 
+from streaming._iterator import NO_PAD
+
 class Stream(AbstractStream):
     """Stream of samples.
     """
@@ -31,8 +33,8 @@ class Stream(AbstractStream):
     def nblock(self):
         raise AttributeError("Stream does not have a blocksize")
 
-    def blocks(self, nblock, noverlap=0):
-        blocks = map(np.array, streaming._iterator.blocks(self._iterator, nblock, noverlap))
+    def blocks(self, nblock, noverlap=0, pad=NO_PAD):
+        blocks = map(np.array, streaming._iterator.blocks(self._iterator, nblock, noverlap, pad))
         return BlockStream(blocks, nblock, noverlap)
 
     def drop(self, nsamples):
@@ -90,9 +92,9 @@ class BlockStream(AbstractStream):
     def noverlap(self):
         return self._noverlap
 
-    def blocks(self, nblock, noverlap=0):
+    def blocks(self, nblock, noverlap=0, pad=NO_PAD):
 
-        blocks = streaming._iterator.change_blocks(self._iterator, self.nblock, self.noverlap, nblock, noverlap)
+        blocks = streaming._iterator.change_blocks(self._iterator, self.nblock, self.noverlap, nblock, noverlap, pad)
         return BlockStream(map(np.array, blocks), nblock, noverlap)
 
     def drop(self, n):
@@ -266,4 +268,4 @@ def _(iterable, n):
 def _(iterable, n):
     return repeat_each(iterable.samples(), n).blocks(iterable.nblock)
 
-__all__ = ['Stream', 'BlockStream', 'count']
+__all__ = ['Stream', 'BlockStream', 'count', 'NO_PAD']
